@@ -9,3 +9,5 @@ extern crate void;
 
 pub mod gpio;
 pub mod flash;
+pub mod i2c;
+pub mod rcc;

@@ -1,8 +1,7 @@
 // shamelessly taken over from https://github.com/saschagrunert/stm32h7-rs/blob/master/src/gpio.rs
 // if you are reading this, your code helped me a lot understanding how to implement stuff for the stm32h7x3
 
-
-
+use crate::rcc::AHB4;
 use core::marker::PhantomData;
 
 /// Extension trait to split a GPIO peripheral in independent pins and registers
@@ -11,7 +10,7 @@ pub trait GpioExt {
     type Parts;
 
     /// Splits the GPIO block into independent pins and registers
-    fn split(self) -> Self::Parts;
+    fn split(self, ahb4: &mut AHB4) -> Self::Parts;
 }
 
 pub struct AF0;
@@ -68,7 +67,7 @@ macro_rules! gpio {
         pub mod $gpiox {
             use core::marker::PhantomData;
             use embedded_hal::digital::{InputPin, OutputPin};
-            use stm32h7::stm32h7x3::{$GPIOX, RCC};
+            use stm32h7::stm32h7x3::{$GPIOX};
             use super::*;
 
             /// GPIO parts
@@ -79,9 +78,8 @@ macro_rules! gpio {
             impl GpioExt for $GPIOX {
                 type Parts = Parts;
 
-                fn split(self) -> Parts {
-                    let rcc = unsafe { &(*RCC::ptr()) };
-                    rcc.ahb4enr.modify(|_, w| w.$iopxenr().set_bit());
+                fn split(self, ahb4: &mut AHB4) -> Parts {
+                    ahb4.enr().modify(|_, w| w.$iopxenr().set_bit());
 
                     Parts {
                         $($pxi: $PXi { _mode: PhantomData },)+
