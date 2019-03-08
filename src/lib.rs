@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(exclusive_range_pattern)] 
 
 extern crate cast;
 extern crate cortex_m;
@@ -11,3 +12,5 @@ pub mod gpio;
 pub mod flash;
 pub mod i2c;
 pub mod rcc;
+pub mod time;
+pub use clock_calc_macro::calc_config;
