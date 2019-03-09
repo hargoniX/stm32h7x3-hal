@@ -32,7 +32,7 @@ impl RccExt for RCC {
                 pclk2: None,
                 pclk3: None,
                 pclk4: None,
-                sysclk: None,
+                sys_ck: None,
                 divp: None,
                 divn: None,
                 divm: None,
@@ -132,7 +132,7 @@ pub struct CFGR {
     pclk2: Option<u32>,
     pclk3: Option<u32>,
     pclk4: Option<u32>,
-    sysclk: Option<u32>,
+    sys_ck: Option<u32>,
     divm: Option<u32>,
     divn: Option<u32>,
     divp: Option<u32>,
@@ -211,12 +211,12 @@ impl CFGR {
         self
     }
 
-    /// Sets the value for the registers used for sysclk generation
+    /// Sets the value for the registers used for sys_ck generation
     /// This function is expected to be used with values from the
     /// calc_config macro for now
     /// TODO: implement the calc_config macro using a const fn onc
     /// const fns support iteration
-    pub fn sysclk(mut self, divm: u32, divn: u32, divp:u32) -> Self
+    pub fn sys_ck(mut self, divm: u32, divn: u32, divp:u32) -> Self
     {
         assert!(divm > 0 && divm < 64, "divm value was out of bounds");
         assert!(divn > 2 && divn < 513, "divn value was out of bounds");
@@ -228,23 +228,24 @@ impl CFGR {
         assert!(ref_ck > 1_000_000 && ref_ck < 16_000_000, "illegal config values for ref_ck");
         let pll_p_ck = (ref_ck * divn) / divp;
         assert!(pll_p_ck < 400_000_000, "illegal config values for pll_p_ck");
-        self.sysclk = Some(pll_p_ck);
+        self.sys_ck = Some(pll_p_ck);
         self
     }
 
     /// Freezes the clock configuration, making it effective
     pub fn freeze(self, acr: &mut ACR) -> Clocks {
-        let sysclk = self.sysclk.unwrap_or(HSI);
+        let mut sys_ck = self.sys_ck.unwrap_or(HSI);
         let rcc = unsafe { &*RCC::ptr()};
         
-        if sysclk == HSI {
+        // set the system clock
+        if sys_ck == HSI {
             // use the HSI as sys_ck
             // usually this value is set to what we write to it by default but you never know
             rcc.cfgr.modify(|_, w| w.sw().bits(0b000));
             while rcc.cfgr.read().sws().bits() != 0b000 {}
         }
         else {
-            // use pll1_p_ck as sysclk
+            // use pll1_p_ck as sys_ck
             // set HSI as pll clock source
             rcc.pllckselr.modify(|_, w| w.pllsrc().bits(00));
 
@@ -290,6 +291,194 @@ impl CFGR {
 
             // wait until the clock switch is done
             while rcc.cfgr.read().sws().bits() != 0b011 {}
+
+            sys_ck = (ref_ck * self.divn.unwrap_or(0x080)) / self.divp.unwrap_or(0b0000001)
+        }
+
+        let mut hpre = 1;
+        let hpre_values = [1, 2, 4, 8, 16, 64, 128, 256, 512].iter();
+
+        // Calculate the hpre divider value
+        // As hclk 1,2,3 and 4 are generated from the same source we just need one value 
+        if self.hclk1.is_some() {
+            let hclk1 = self.hclk1.unwrap();
+            assert!(hclk1 < 200_000_000, "Value for hclk1 is too big");
+            let mut closest = 200_000_000;
+            let mut best_hpre = 1;
+            for test_hpre in hpre_values{
+                if (hclk1 - (sys_ck / test_hpre)) < closest {
+                    best_hpre = *test_hpre;
+                    closest = hclk1 - (sys_ck / test_hpre);
+                }
+            }
+            hpre = best_hpre;
+        }
+        else if self.hclk2.is_some() {
+            let hclk2 = self.hclk2.unwrap();
+            assert!(hclk2 < 200_000_000, "Value for hclk2 is too big");
+            let mut closest = 200_000_000;
+            let mut best_hpre = 1;
+            for test_hpre in hpre_values {
+                if (hclk2 - (sys_ck / test_hpre)) < closest {
+                    best_hpre = *test_hpre;
+                    closest = hclk2 - (sys_ck / test_hpre);
+                }
+            }
+            hpre = best_hpre;
+        }
+        else if self.hclk3.is_some() {
+            let hclk3 = self.hclk3.unwrap();
+            assert!(hclk3 < 200_000_000, "Value for hclk3 is too big");
+            let mut closest = 200_000_000;
+            let mut best_hpre = 1;
+            for test_hpre in hpre_values {
+                if (hclk3 - (sys_ck / test_hpre)) < closest {
+                    best_hpre = *test_hpre;
+                    closest = hclk3 - (sys_ck / test_hpre);
+                }
+            }
+            hpre = best_hpre;
+        }
+        else if self.hclk4.is_some() {
+            let hclk4 = self.hclk4.unwrap();
+            assert!(hclk4 < 200_000_000, "Value for hclk4 is too big");
+            let mut closest = 200_000_000;
+            let mut best_hpre = 1;
+            for test_hpre in hpre_values {
+                if (hclk4 - (sys_ck / test_hpre)) < closest {
+                    best_hpre = *test_hpre;
+                    closest = hclk4 - (sys_ck / test_hpre);
+                } 
+            }
+            hpre = best_hpre;
+        }
+        else {
+            if sys_ck > 200_000_000 {
+                // as the max value for sys_ck is 400 Mhz it is safe to set
+                // hpre to 2 as (value <= 400)/2 will be a value <= 200 
+                hpre = 2;
+            }
+        }
+
+        // set the hpre value
+        rcc.d1cfgr.modify(|_, w| w.hpre().bits(u8(hpre).unwrap()));
+        let hclk = sys_ck / hpre;
+
+
+        // adjust flash wait states
+        // as VOS3 is the default VOS used only the values for VOS3 are implemented here
+        let acr_config: (u8, u8) = match hclk {
+            0..45_000_000 => (0, 0),
+            45_000_001..90_000_000 => (1, 1),
+            90_000_001..135_000_000 => (2, 1),
+            135_000_001..180_000_000 => (3, 2),
+            180_000_001..225_000_000 => (4, 2),
+             _ => unreachable!(),
+        };
+        acr.acr().modify(|_, w| w.latency().bits(acr_config.0).wrhighfreq().bits(acr_config.1));
+
+        let mut d1ppre = 1;
+        let d1ppre_values = [1, 2, 4, 8, 16].iter();
+        
+        // calculate the best d1ppre value
+        let mut pclk1 = self.pclk1.unwrap_or(hclk);
+        if pclk1 != hclk {
+            let mut closest = 200_000_000;
+            let mut best_d1ppre = 1;
+            for test_d1ppre in d1ppre_values {
+                if pclk1 - (hclk / test_d1ppre) < closest {
+                    best_d1ppre = *test_d1ppre;
+                    closest = pclk1 - (hclk / test_d1ppre);
+                }
+            }
+            d1ppre = best_d1ppre;
+        }
+
+        let mut d2ppre1 = 1;
+        let d2ppre1_values = [1, 2, 4, 8, 16].iter();
+        
+        // calculate the best d2ppre1 value
+        let mut pclk2 = self.pclk2.unwrap_or(hclk);
+        if pclk2 != hclk {
+            let mut closest = 200_000_000;
+            let mut best_d2ppre1 = 1;
+            for test_d2ppre1 in d2ppre1_values {
+                if pclk2 - (hclk / test_d2ppre1) < closest {
+                    best_d2ppre1 = *test_d2ppre1;
+                    closest = pclk2 - (hclk / test_d2ppre1);
+                }
+            }
+            d2ppre1 = best_d2ppre1;
+        }
+
+        let mut d2ppre2 = 1;
+        let d2ppre2_values = [1, 2, 4, 8, 16].iter();
+        
+        // calculate the best d2ppre2 value
+        let mut pclk3 = self.pclk3.unwrap_or(hclk);
+        if pclk3 != hclk {
+            let mut closest = 200_000_000;
+            let mut best_d2ppre2 = 1;
+            for test_d2ppre2 in d2ppre2_values {
+                if pclk3 - (hclk / test_d2ppre2) < closest {
+                    best_d2ppre2 = *test_d2ppre2;
+                    closest = pclk3 - (hclk / test_d2ppre2);
+                }
+            }
+            d2ppre2 = best_d2ppre2;
+        }
+
+        let mut d3ppre = 1;
+        let d3ppre_values = [1, 2, 4, 8, 16].iter();
+        
+        // calculate the best d3ppre value
+        let mut pclk4 = self.pclk4.unwrap_or(hclk);
+        if pclk4 != hclk {
+            let mut closest = 200_000_000;
+            let mut best_d3ppre = 1;
+            for test_d3ppre in d3ppre_values {
+                if pclk4 - (hclk / test_d3ppre) < closest {
+                    best_d3ppre = *test_d3ppre;
+                    closest = pclk4 - (hclk / test_d3ppre);
+                }
+            }
+            d3ppre = best_d3ppre;
+        }
+
+
+
+        // set d1ppre value
+        rcc.d1cfgr.modify(|_, w| w.d1ppre().bits(u8(d1ppre).unwrap()));
+
+        // set d2ppre1 value
+        rcc.d2cfgr.modify(|_, w| w.d2ppre1().bits(u8(d2ppre1).unwrap()));
+
+        // set d2ppre2 value
+        rcc.d2cfgr.modify(|_, w| w.d2ppre2().bits(u8(d2ppre2).unwrap()));
+
+        // set d3ppre value
+        rcc.d3cfgr.modify(|_, w| w.d3ppre().bits(u8(d3ppre).unwrap()));
+
+        pclk1 = hclk / d1ppre;
+        pclk2 = hclk / d2ppre1;
+        pclk3 = hclk / d2ppre2;
+        pclk4 = hclk / d3ppre;
+
+        Clocks {
+            sys_ck: Hertz(sys_ck),
+            hclk1: Hertz(hclk),
+            hclk2: Hertz(hclk),
+            hclk3: Hertz(hclk),
+            hclk4: Hertz(hclk),
+            pclk1: Hertz(pclk1),
+            pclk2: Hertz(pclk2),
+            pclk3: Hertz(pclk3),
+            pclk4: Hertz(pclk4),
+            hpre: u8(hpre).unwrap(),
+            d1ppre: u8(d1ppre).unwrap(),
+            d2ppre1: u8(d2ppre1).unwrap(),
+            d2ppre2: u8(d2ppre2).unwrap(),
+            d3ppre: u8(d3ppre).unwrap(),
         }
     }
 }
@@ -299,7 +488,7 @@ impl CFGR {
 /// The existence of this value indicates that the clock configuration can no longer be changed
 #[derive(Clone, Copy)]
 pub struct Clocks {
-    sysclk: Hertz,
+    sys_ck: Hertz,
     pclk1: Hertz,
     pclk2: Hertz,
     pclk3: Hertz,
@@ -308,12 +497,17 @@ pub struct Clocks {
     hclk2: Hertz,
     hclk3: Hertz,
     hclk4: Hertz,
+    hpre: u8,
+    d1ppre: u8,
+    d2ppre1: u8,
+    d2ppre2: u8,
+    d3ppre: u8,
 }
 
 
 impl Clocks {
-    pub fn sysclk(&self) -> Hertz {
-        self.sysclk
+    pub fn sys_ck(&self) -> Hertz {
+        self.sys_ck
     }
 
     pub fn pclk1(&self) -> Hertz {
@@ -346,5 +540,21 @@ impl Clocks {
 
     pub fn hclk4(&self) -> Hertz {
         self.hclk4
+    }
+
+    pub fn d1ppre(&self) -> u8 {
+        self.d1ppre
+    }
+
+    pub fn d2ppre1(&self) -> u8 {
+        self.d2ppre1
+    }
+
+    pub fn d2ppre2(&self) -> u8 {
+        self.d2ppre2
+    }
+
+    pub fn d3ppre(&self) -> u8 {
+        self.d3ppre
     }
 }
