@@ -3,8 +3,6 @@ use cast::{u8, u16};
 use crate::time::Hertz;
 use crate::flash::ACR;
 
-
-
 /// Extension trait that constrains the `RCC` peripheral
 pub trait RccExt {
     /// Constrains the `RCC` peripheral so it plays nicely with the other abstractions
@@ -241,16 +239,16 @@ impl CFGR {
         if sys_ck == HSI {
             // use the HSI as sys_ck
             // usually this value is set to what we write to it by default but you never know
-            rcc.cfgr.modify(|_, w| w.sw().bits(0b000));
+            rcc.cfgr.modify(|_, w| unsafe {w.sw().bits(0b000)});
             while rcc.cfgr.read().sws().bits() != 0b000 {}
         }
         else {
             // use pll1_p_ck as sys_ck
             // set HSI as pll clock source
-            rcc.pllckselr.modify(|_, w| w.pllsrc().bits(00));
+            rcc.pllckselr.modify(|_, w| unsafe {w.pllsrc().bits(00)});
 
             // set divm1 value, set to default if not set by software
-            rcc.pllckselr.modify(|_, w| w.divm1().bits(u8(self.divm.unwrap_or(0b100000)).unwrap()));
+            rcc.pllckselr.modify(|_, w| unsafe{ w.divm1().bits(u8(self.divm.unwrap_or(0b100000)).unwrap())});
 
             let ref_ck = HSI / self.divm.unwrap_or(0b100000);
 
@@ -262,7 +260,7 @@ impl CFGR {
                 8_000_001..16_000_000 => 0b11,
                 _ => unreachable!(),
             };
-            rcc.pllcfgr.modify(|_, w| w.pll1rge().bits(rge_bits));
+            rcc.pllcfgr.modify(|_, w| unsafe{ w.pll1rge().bits(rge_bits)});
 
             // calculate and set the bist for the VCOSEL register
             // if the frequency of ref_ck is < 2 Mhz and > 1 Mhz set to 1 otherwise to 0
@@ -276,18 +274,18 @@ impl CFGR {
             rcc.pllcfgr.modify(|_, w| w.pll1fracen().clear_bit());
 
             // set DIVN1
-            rcc.pll1divr.modify(|_, w| w.divn1().bits(u16(self.divn.unwrap_or(0x080)).unwrap()));
+            rcc.pll1divr.modify(|_, w| unsafe { w.divn1().bits(u16(self.divn.unwrap_or(0x080)).unwrap())});
 
             // enable and set DIVP1
             rcc.pllcfgr.modify(|_, w| w.divp1en().set_bit());
-            rcc.pll1divr.modify(|_, w| w.divp1().bits(u8(self.divp.unwrap_or(0b0000001)).unwrap()));
+            rcc.pll1divr.modify(|_, w| unsafe {w.divp1().bits(u8(self.divp.unwrap_or(0b0000001)).unwrap())});
 
             // enable pll1 and wait until its ready
             rcc.cr.modify(|_, w| w.pll1on().set_bit());
             while !(rcc.cr.read().pll1rdy().bit()) {}
 
             // set pll1_p_ck as sys_ck
-            rcc.cfgr.modify(|_, w| w.sw().bits(0b011));
+            rcc.cfgr.modify(|_, w| unsafe {w.sw().bits(0b011)});
 
             // wait until the clock switch is done
             while rcc.cfgr.read().sws().bits() != 0b011 {}
@@ -361,7 +359,7 @@ impl CFGR {
         }
 
         // set the hpre value
-        rcc.d1cfgr.modify(|_, w| w.hpre().bits(u8(hpre).unwrap()));
+        rcc.d1cfgr.modify(|_, w| unsafe {w.hpre().bits(u8(hpre).unwrap())});
         let hclk = sys_ck / hpre;
 
 
@@ -375,7 +373,7 @@ impl CFGR {
             180_000_001..225_000_000 => (4, 2),
              _ => unreachable!(),
         };
-        acr.acr().modify(|_, w| w.latency().bits(acr_config.0).wrhighfreq().bits(acr_config.1));
+        acr.acr().modify(|_, w| unsafe {w.latency().bits(acr_config.0).wrhighfreq().bits(acr_config.1)});
 
         let mut d1ppre = 1;
         let d1ppre_values = [1, 2, 4, 8, 16].iter();
@@ -448,16 +446,16 @@ impl CFGR {
 
 
         // set d1ppre value
-        rcc.d1cfgr.modify(|_, w| w.d1ppre().bits(u8(d1ppre).unwrap()));
+        rcc.d1cfgr.modify(|_, w| unsafe {w.d1ppre().bits(u8(d1ppre).unwrap())});
 
         // set d2ppre1 value
-        rcc.d2cfgr.modify(|_, w| w.d2ppre1().bits(u8(d2ppre1).unwrap()));
+        rcc.d2cfgr.modify(|_, w| unsafe {w.d2ppre1().bits(u8(d2ppre1).unwrap())});
 
         // set d2ppre2 value
-        rcc.d2cfgr.modify(|_, w| w.d2ppre2().bits(u8(d2ppre2).unwrap()));
+        rcc.d2cfgr.modify(|_, w| unsafe {w.d2ppre2().bits(u8(d2ppre2).unwrap())});
 
         // set d3ppre value
-        rcc.d3cfgr.modify(|_, w| w.d3ppre().bits(u8(d3ppre).unwrap()));
+        rcc.d3cfgr.modify(|_, w| unsafe {w.d3ppre().bits(u8(d3ppre).unwrap())});
 
         pclk1 = hclk / d1ppre;
         pclk2 = hclk / d2ppre1;
