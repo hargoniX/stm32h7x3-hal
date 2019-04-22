@@ -11,7 +11,7 @@ pool:
 
 steps:
 - script: |
-    curl https://sh.rustup.rs -sSf | sh
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
     echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
     rustup default nightly
   displayName: 'Install rust nightly'
