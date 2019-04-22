@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(exclusive_range_pattern)] 
 
 extern crate cast;
 extern crate cortex_m;

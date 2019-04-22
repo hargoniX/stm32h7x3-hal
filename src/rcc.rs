@@ -236,33 +236,157 @@ impl CFGR {
         let rcc = unsafe { &*RCC::ptr()};
         
         // set the system clock
-        if sys_ck == HSI {
-            // use the HSI as sys_ck
-            // usually this value is set to what we write to it by default but you never know
-            rcc.cfgr.modify(|_, w| unsafe {w.sw().bits(0b000)});
-            while rcc.cfgr.read().sws().bits() != 0b000 {}
+        let pll_frequency = if sys_ck == HSI {
+            None
         }
         else {
-            // use pll1_p_ck as sys_ck
-            // set HSI as pll clock source
+            // this calculates the sys_ck frequency generated from the pll with the given config values
+            // for closer details check the clock tree in the reference manual at page 323
+            let frequency = ((HSI / self.divm.unwrap_or(0b100000)) * self.divn.unwrap_or(0x080)) / self.divp.unwrap_or(0b0000001);
+            sys_ck = frequency;
+            Some(frequency)
+        };
+        
+        // Calculate the hpre divider value
+        // As hclk 1,2,3 and 4 are generated from the same source we just need one value
+        let hclk = self.hclk1.unwrap_or(self.hclk2.unwrap_or(self.hclk3.unwrap_or(self.hclk4.unwrap_or(if sys_ck > 240_000_000 {sys_ck/2} else {sys_ck}))));
+        
+        let hpre_bits: u8 = match sys_ck / hclk {
+            0 => unreachable!(),
+            1 => 0b0111,
+            2 => 0b1000,
+            3...5 => 0b1001,
+            6...9 => 0b1010,
+            10...16 => 0b1011,
+            17...64 => 0b1100,
+            65...128 => 0b1101,
+            129...256 => 0b1110,
+            257...512 => 0b1111,
+            _ => 0b1111 
+        };
+        let hpre = 1 << (hpre_bits - 0b0111);
+        let hclk = sys_ck / hpre;
+        
+        // set the hpre value
+        //rcc.d1cfgr.modify(|_, w| unsafe {w.hpre().bits(u8(hpre).unwrap())});
+
+        // adjust flash wait states
+        // as VOS3 is the default VOS used only the values for VOS3 are implemented here
+        let acr_config: (u8, u8) = match hclk {
+            0...45_000_000 => (0, 0),
+            45_000_001...90_000_000 => (1, 1),
+            90_000_001...135_000_000 => (2, 1),
+            135_000_001...180_000_000 => (3, 2),
+            180_000_001...225_000_000 => (4, 2),
+             _ => unreachable!(),
+        };
+        
+        // calculate d1ppre
+        let d1ppre_bits: u8 = match hclk / self.pclk3.unwrap_or(hclk) {
+            0 => unreachable!(),
+            1 => 0b011,
+            2 => 0b100,
+            3...4 => 0b101,
+            5...8 => 0b110,
+            9...16 => 0b111,
+            _ => 0b111,
+        };
+        let d1ppre = 1 << (d1ppre_bits - 0b011);
+        let pclk3 = hclk / d1ppre;
+
+        // calculate d2ppre1
+        let d2ppre1_bits: u8 = match hclk / self.pclk1.unwrap_or(hclk) {
+            0 => unreachable!(),
+            1 => 0b011,
+            2 => 0b100,
+            3...4 => 0b101,
+            5...8 => 0b110,
+            9...16 => 0b111,
+            _ => 0b111,
+        };
+        let d2ppre1 = 1 << (d2ppre1_bits - 0b011);
+        let pclk1 = hclk / d2ppre1;
+
+        // calculate d2ppre2
+        let d2ppre2_bits: u8 = match hclk / self.pclk2.unwrap_or(hclk) {
+            0 => unreachable!(),
+            1 => 0b011,
+            2 => 0b100,
+            3...4 => 0b101,
+            5...8 => 0b110,
+            9...16 => 0b111,
+            _ => 0b111,
+        };
+        let d2ppre2 = 1 << (d2ppre2_bits - 0b011);
+        let pclk2 = hclk / d2ppre2;
+
+        //calculate d3ppre
+        let d3ppre_bits: u8 = match hclk / self.pclk4.unwrap_or(hclk) {
+            0 => unreachable!(),
+            1 => 0b011,
+            2 => 0b100,
+            3...4 => 0b101,
+            5...8 => 0b110,
+            9...16 => 0b111,
+            _ => 0b111,
+        };
+        let d3ppre = 1 << (d3ppre_bits - 0b011);
+        let pclk4 = hclk / d3ppre;
+
+        // write the flash wait states
+        acr.acr().modify(|_, w| unsafe {w.latency().bits(acr_config.0).wrhighfreq().bits(acr_config.1)});
+
+        // set the hpre value
+        rcc.d1cfgr.modify(|_, w| unsafe {w.hpre().bits(hpre_bits)});
+        
+        // set all the AHB prescaler values
+        rcc.d1cfgr.modify(|_, w| unsafe {
+            w.d1ppre().bits(d1ppre_bits)
+            
+        });
+
+        rcc.d2cfgr.modify(|_, w| unsafe {
+            w
+            .d2ppre1().bits(d2ppre1_bits)
+            .d2ppre2().bits(d2ppre2_bits)
+        });
+
+        rcc.d3cfgr.modify(|_, w| unsafe {
+            w.d3ppre().bits(d3ppre_bits)
+        });
+
+        // adjust sys_ck source
+        if pll_frequency .is_some() {
+            // use pll as sys_ck
+            
+            // set HSI as pll source
             rcc.pllckselr.modify(|_, w| unsafe {w.pllsrc().bits(00)});
+
+            // set DIVN1
+            rcc.pll1divr.modify(|_, w| unsafe { w.divn1().bits(u16(self.divn.unwrap_or(0x080)).unwrap())});
 
             // set divm1 value, set to default if not set by software
             rcc.pllckselr.modify(|_, w| unsafe{ w.divm1().bits(u8(self.divm.unwrap_or(0b100000)).unwrap())});
+
+            // enable and set DIVP1
+            rcc.pllcfgr.modify(|_, w| w.divp1en().set_bit());
+
+            //disable frac mode of pll1
+            rcc.pllcfgr.modify(|_, w| w.pll1fracen().clear_bit());
 
             let ref_ck = HSI / self.divm.unwrap_or(0b100000);
 
             // calculate and set the bits for the RGE register
             let rge_bits = match ref_ck  {
-                1_000_001..2_000_000 => 0b00,
-                2_000_001..4_000_000 => 0b01,
-                4_000_001..8_000_000 => 0b10,
-                8_000_001..16_000_000 => 0b11,
+                1_000_000...2_000_000 => 0b00,
+                2_000_001...4_000_000 => 0b01,
+                4_000_001...8_000_000 => 0b10,
+                8_000_001...16_000_000 => 0b11,
                 _ => unreachable!(),
             };
             rcc.pllcfgr.modify(|_, w| unsafe{ w.pll1rge().bits(rge_bits)});
 
-            // calculate and set the bist for the VCOSEL register
+            // calculate and set the bits for the VCOSEL register
             // if the frequency of ref_ck is < 2 Mhz and > 1 Mhz set to 1 otherwise to 0
             let mut vcosel_bit = false;
             if ref_ck < 2_000_000 {
@@ -270,197 +394,24 @@ impl CFGR {
             }
             rcc.pllcfgr.modify(|_, w| w.pll1vcosel().bit(vcosel_bit));
 
-            //disable frac mode of pll1
-            rcc.pllcfgr.modify(|_, w| w.pll1fracen().clear_bit());
-
-            // set DIVN1
-            rcc.pll1divr.modify(|_, w| unsafe { w.divn1().bits(u16(self.divn.unwrap_or(0x080)).unwrap())});
-
-            // enable and set DIVP1
-            rcc.pllcfgr.modify(|_, w| w.divp1en().set_bit());
             rcc.pll1divr.modify(|_, w| unsafe {w.divp1().bits(u8(self.divp.unwrap_or(0b0000001)).unwrap())});
 
             // enable pll1 and wait until its ready
             rcc.cr.modify(|_, w| w.pll1on().set_bit());
-            while !(rcc.cr.read().pll1rdy().bit()) {}
+            while rcc.cr.read().pll1rdy().bit_is_set() {}
 
             // set pll1_p_ck as sys_ck
             rcc.cfgr.modify(|_, w| unsafe {w.sw().bits(0b011)});
 
             // wait until the clock switch is done
             while rcc.cfgr.read().sws().bits() != 0b011 {}
-
-            sys_ck = (ref_ck * self.divn.unwrap_or(0x080)) / self.divp.unwrap_or(0b0000001)
-        }
-
-        let mut hpre = 1;
-        let hpre_values = [1, 2, 4, 8, 16, 64, 128, 256, 512].iter();
-
-        // Calculate the hpre divider value
-        // As hclk 1,2,3 and 4 are generated from the same source we just need one value 
-        if self.hclk1.is_some() {
-            let hclk1 = self.hclk1.unwrap();
-            assert!(hclk1 < 200_000_000, "Value for hclk1 is too big");
-            let mut closest = 200_000_000;
-            let mut best_hpre = 1;
-            for test_hpre in hpre_values{
-                if (hclk1 - (sys_ck / test_hpre)) < closest {
-                    best_hpre = *test_hpre;
-                    closest = hclk1 - (sys_ck / test_hpre);
-                }
-            }
-            hpre = best_hpre;
-        }
-        else if self.hclk2.is_some() {
-            let hclk2 = self.hclk2.unwrap();
-            assert!(hclk2 < 200_000_000, "Value for hclk2 is too big");
-            let mut closest = 200_000_000;
-            let mut best_hpre = 1;
-            for test_hpre in hpre_values {
-                if (hclk2 - (sys_ck / test_hpre)) < closest {
-                    best_hpre = *test_hpre;
-                    closest = hclk2 - (sys_ck / test_hpre);
-                }
-            }
-            hpre = best_hpre;
-        }
-        else if self.hclk3.is_some() {
-            let hclk3 = self.hclk3.unwrap();
-            assert!(hclk3 < 200_000_000, "Value for hclk3 is too big");
-            let mut closest = 200_000_000;
-            let mut best_hpre = 1;
-            for test_hpre in hpre_values {
-                if (hclk3 - (sys_ck / test_hpre)) < closest {
-                    best_hpre = *test_hpre;
-                    closest = hclk3 - (sys_ck / test_hpre);
-                }
-            }
-            hpre = best_hpre;
-        }
-        else if self.hclk4.is_some() {
-            let hclk4 = self.hclk4.unwrap();
-            assert!(hclk4 < 200_000_000, "Value for hclk4 is too big");
-            let mut closest = 200_000_000;
-            let mut best_hpre = 1;
-            for test_hpre in hpre_values {
-                if (hclk4 - (sys_ck / test_hpre)) < closest {
-                    best_hpre = *test_hpre;
-                    closest = hclk4 - (sys_ck / test_hpre);
-                } 
-            }
-            hpre = best_hpre;
         }
         else {
-            if sys_ck > 200_000_000 {
-                // as the max value for sys_ck is 400 Mhz it is safe to set
-                // hpre to 2 as (value <= 400)/2 will be a value <= 200 
-                hpre = 2;
-            }
+            // use HSI AS CLOCK SOURCE
+            // usually this value is set to what we write to it by default but you never know
+            rcc.cfgr.modify(|_, w| unsafe {w.sw().bits(0b000)});
+            while rcc.cfgr.read().sws().bits() != 0b000 {}
         }
-
-        // set the hpre value
-        rcc.d1cfgr.modify(|_, w| unsafe {w.hpre().bits(u8(hpre).unwrap())});
-        let hclk = sys_ck / hpre;
-
-
-        // adjust flash wait states
-        // as VOS3 is the default VOS used only the values for VOS3 are implemented here
-        let acr_config: (u8, u8) = match hclk {
-            0..45_000_000 => (0, 0),
-            45_000_001..90_000_000 => (1, 1),
-            90_000_001..135_000_000 => (2, 1),
-            135_000_001..180_000_000 => (3, 2),
-            180_000_001..225_000_000 => (4, 2),
-             _ => unreachable!(),
-        };
-        acr.acr().modify(|_, w| unsafe {w.latency().bits(acr_config.0).wrhighfreq().bits(acr_config.1)});
-
-        let mut d1ppre = 1;
-        let d1ppre_values = [1, 2, 4, 8, 16].iter();
-        
-        // calculate the best d1ppre value
-        let mut pclk1 = self.pclk1.unwrap_or(hclk);
-        if pclk1 != hclk {
-            let mut closest = 200_000_000;
-            let mut best_d1ppre = 1;
-            for test_d1ppre in d1ppre_values {
-                if pclk1 - (hclk / test_d1ppre) < closest {
-                    best_d1ppre = *test_d1ppre;
-                    closest = pclk1 - (hclk / test_d1ppre);
-                }
-            }
-            d1ppre = best_d1ppre;
-        }
-
-        let mut d2ppre1 = 1;
-        let d2ppre1_values = [1, 2, 4, 8, 16].iter();
-        
-        // calculate the best d2ppre1 value
-        let mut pclk2 = self.pclk2.unwrap_or(hclk);
-        if pclk2 != hclk {
-            let mut closest = 200_000_000;
-            let mut best_d2ppre1 = 1;
-            for test_d2ppre1 in d2ppre1_values {
-                if pclk2 - (hclk / test_d2ppre1) < closest {
-                    best_d2ppre1 = *test_d2ppre1;
-                    closest = pclk2 - (hclk / test_d2ppre1);
-                }
-            }
-            d2ppre1 = best_d2ppre1;
-        }
-
-        let mut d2ppre2 = 1;
-        let d2ppre2_values = [1, 2, 4, 8, 16].iter();
-        
-        // calculate the best d2ppre2 value
-        let mut pclk3 = self.pclk3.unwrap_or(hclk);
-        if pclk3 != hclk {
-            let mut closest = 200_000_000;
-            let mut best_d2ppre2 = 1;
-            for test_d2ppre2 in d2ppre2_values {
-                if pclk3 - (hclk / test_d2ppre2) < closest {
-                    best_d2ppre2 = *test_d2ppre2;
-                    closest = pclk3 - (hclk / test_d2ppre2);
-                }
-            }
-            d2ppre2 = best_d2ppre2;
-        }
-
-        let mut d3ppre = 1;
-        let d3ppre_values = [1, 2, 4, 8, 16].iter();
-        
-        // calculate the best d3ppre value
-        let mut pclk4 = self.pclk4.unwrap_or(hclk);
-        if pclk4 != hclk {
-            let mut closest = 200_000_000;
-            let mut best_d3ppre = 1;
-            for test_d3ppre in d3ppre_values {
-                if pclk4 - (hclk / test_d3ppre) < closest {
-                    best_d3ppre = *test_d3ppre;
-                    closest = pclk4 - (hclk / test_d3ppre);
-                }
-            }
-            d3ppre = best_d3ppre;
-        }
-
-
-
-        // set d1ppre value
-        rcc.d1cfgr.modify(|_, w| unsafe {w.d1ppre().bits(u8(d1ppre).unwrap())});
-
-        // set d2ppre1 value
-        rcc.d2cfgr.modify(|_, w| unsafe {w.d2ppre1().bits(u8(d2ppre1).unwrap())});
-
-        // set d2ppre2 value
-        rcc.d2cfgr.modify(|_, w| unsafe {w.d2ppre2().bits(u8(d2ppre2).unwrap())});
-
-        // set d3ppre value
-        rcc.d3cfgr.modify(|_, w| unsafe {w.d3ppre().bits(u8(d3ppre).unwrap())});
-
-        pclk1 = hclk / d1ppre;
-        pclk2 = hclk / d2ppre1;
-        pclk3 = hclk / d2ppre2;
-        pclk4 = hclk / d3ppre;
 
         Clocks {
             sys_ck: Hertz(sys_ck),
