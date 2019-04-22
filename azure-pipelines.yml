@@ -10,7 +10,9 @@ pool:
   vmImage: 'Ubuntu-16.04'
 
 steps:
-- script: curl -s https://static.rust-lang.org/rustup.sh | sh -s -- --channel=nightly
+- script: |
+    curl -s https://static.rust-lang.org/rustup.sh | sh -s -- --channel=nightly
+    echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
   displayName: 'Install rust nightly'
 - script: cargo build --all
   displayName: "Build the project"
