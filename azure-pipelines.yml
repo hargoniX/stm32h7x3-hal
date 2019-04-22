@@ -11,7 +11,7 @@ pool:
 
 steps:
 - script: |
-    curl -s https://static.rust-lang.org/rustup.sh | sh -s -- --channel=nightly
+    curl https://sh.rustup.rs -sSf | sh -s -- --channel=nightly
     echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
   displayName: 'Install rust nightly'
 - script: cargo build --all
