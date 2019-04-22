@@ -15,7 +15,11 @@ steps:
     source $HOME/.cargo/env
     rustup default nightly
   displayName: 'Install rust nightly'
-- script: cargo build --all
+- script: |
+    source $HOME/.cargo/env
+    cargo build --all
   displayName: "Build the project"
-- script: cargo test
+- script: |
+    source $HOME/.cargo/env
+    cargo test
   displayName: "Run unittests"
