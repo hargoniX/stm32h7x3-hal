@@ -1,4 +1,4 @@
 /target
 **/*.rs.bk
-/clock_calc_macro/target
-/clock_calc_macro/*.rs.bk
+/compile_time_calculations/target
+/compile_time_calculations/*.rs.bk
