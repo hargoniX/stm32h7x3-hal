@@ -12,4 +12,5 @@ pub mod flash;
 pub mod rcc;
 pub mod time;
 pub mod delay;
+pub mod watchdog;
 pub use compile_time_calculations::*;
