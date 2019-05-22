@@ -9,8 +9,10 @@ extern crate void;
 
 pub mod gpio;
 pub mod flash;
+pub mod i2c;
 pub mod rcc;
 pub mod time;
 pub mod delay;
 pub mod watchdog;
+pub use stm32h7::stm32h7x3;
 pub use compile_time_calculations::*;
