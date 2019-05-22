@@ -266,9 +266,6 @@ impl CFGR {
         };
         let hpre = 1 << (hpre_bits - 0b0111);
         let hclk = sys_ck / hpre;
-        
-        // set the hpre value
-        //rcc.d1cfgr.modify(|_, w| unsafe {w.hpre().bits(u8(hpre).unwrap())});
 
         // adjust flash wait states
         // as VOS3 is the default VOS used only the values for VOS3 are implemented here
