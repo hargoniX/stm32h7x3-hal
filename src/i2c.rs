@@ -6,7 +6,7 @@ use crate::gpio::gpioc::PC9;
 use crate::gpio::gpiod::{PD12, PD13};
 use crate::gpio::gpiof::{PF0, PF1, PF14, PF15};
 use crate::gpio::gpioh::{PH11, PH12, PH4, PH5, PH7, PH8};
-use crate::gpio::{Alternate,AF4};
+use crate::gpio::{Alternate,AF4, Output, OpenDrain};
 use crate::rcc::{Clocks, APB1L, APB4};
 use crate::time::Hertz;
 use hal::blocking::i2c::{Write, WriteRead, Read};
@@ -36,44 +36,44 @@ pub unsafe trait SclPin<I2C> {}
 pub unsafe trait SdaPin<I2C> {}
 
 // I2C1_SCL
-unsafe impl SclPin<I2C1> for PB6<Alternate<AF4>> {}
-unsafe impl SclPin<I2C1> for PB8<Alternate<AF4>> {}
+unsafe impl SclPin<I2C1> for PB6<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C1> for PB8<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C1_SDA
-unsafe impl SdaPin<I2C1> for PB7<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C1> for PB9<Alternate<AF4>> {}
+unsafe impl SdaPin<I2C1> for PB7<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C1> for PB9<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C2_SCL
-unsafe impl SclPin<I2C2> for PB10<Alternate<AF4>> {}
-unsafe impl SclPin<I2C2> for PF1<Alternate<AF4>> {}
-unsafe impl SclPin<I2C2> for PH4<Alternate<AF4>> {}
+unsafe impl SclPin<I2C2> for PB10<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C2> for PF1<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C2> for PH4<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C2_SDA
-unsafe impl SdaPin<I2C2> for PB11<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C2> for PF0<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C2> for PH5<Alternate<AF4>> {}
+unsafe impl SdaPin<I2C2> for PB11<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C2> for PF0<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C2> for PH5<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C3_SCL
-unsafe impl SclPin<I2C3> for PA8<Alternate<AF4>> {}
-unsafe impl SclPin<I2C3> for PH7<Alternate<AF4>> {}
+unsafe impl SclPin<I2C3> for PA8<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C3> for PH7<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C3_SDA
-unsafe impl SdaPin<I2C3> for PC9<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C3> for PH8<Alternate<AF4>> {}
+unsafe impl SdaPin<I2C3> for PC9<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C3> for PH8<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C4_SCL
-unsafe impl SclPin<I2C4> for PD12<Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PF14<Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PH11<Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PB6<Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PB8<Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PD12<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PF14<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PH11<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PB6<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PB8<Output<OpenDrain>, Alternate<AF4>> {}
 
 // I2C4_SDA
-unsafe impl SdaPin<I2C4> for PB7<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PB9<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PD13<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PF15<Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PH12<Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PB7<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PB9<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PD13<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PF15<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PH12<Output<OpenDrain>, Alternate<AF4>> {}
 
 pub struct I2c<I2C, PINS> {
     i2c: I2C,

@@ -39,6 +39,11 @@ pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Output mode (type state)
+pub struct Output<MODE> {
+    _mode: PhantomData<MODE>,
+}
+
 /// Floating input (type state)
 pub struct Floating;
 
@@ -50,11 +55,6 @@ pub struct PullUp;
 
 /// Open drain input or output (type state)
 pub struct OpenDrain;
-
-/// Output mode (type state)
-pub struct Output<MODE> {
-    _mode: PhantomData<MODE>,
-}
 
 /// Push pull output (type state)
 pub struct PushPull;
@@ -72,7 +72,7 @@ macro_rules! gpio {
 
             /// GPIO parts
             pub struct Parts {
-                $(pub $pxi: $PXi<$MODE>,)+
+                $(pub $pxi: $PXi<$MODE, Alternate<AF0>>,)+
             }
 
             impl GpioExt for $GPIOX {
@@ -82,7 +82,7 @@ macro_rules! gpio {
                     ahb4.enr().modify(|_, w| w.$iopxenr().set_bit());
 
                     Parts {
-                        $($pxi: $PXi { _mode: PhantomData },)+
+                        $($pxi: $PXi {_io_mode: PhantomData, _af_mode: PhantomData,},)+
                     }
                 }
             }
@@ -136,143 +136,144 @@ macro_rules! gpio {
 
             $(
                 /// Pin
-                pub struct $PXi<MODE> {
-                    _mode: PhantomData<MODE>,
+                pub struct $PXi<IoMode, AlternateMode> {
+                    _io_mode: PhantomData<IoMode>,
+                    _af_mode: PhantomData<AlternateMode>,
                 }
 
-                impl<MODE> $PXi<MODE> {
+                impl<IoMode, AlternateMode> $PXi<IoMode, AlternateMode> {
                     /// Configures the pin to operate in AF0 mode
                     pub fn into_alternate_af0(
                         self,
-                    ) -> $PXi<Alternate<AF0>> {
+                    ) -> $PXi<IoMode, Alternate<AF0>> {
                         _set_alternate_mode($i, 0);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF1 mode
                     pub fn into_alternate_af1(
                         self,
-                    ) -> $PXi<Alternate<AF1>> {
+                    ) -> $PXi<IoMode, Alternate<AF1>> {
                         _set_alternate_mode($i, 1);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF2 mode
                     pub fn into_alternate_af2(
                         self,
-                    ) -> $PXi<Alternate<AF2>> {
+                    ) -> $PXi<IoMode, Alternate<AF2>> {
                         _set_alternate_mode($i, 2);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF3 mode
                     pub fn into_alternate_af3(
                         self,
-                    ) -> $PXi<Alternate<AF3>> {
+                    ) -> $PXi<IoMode, Alternate<AF3>> {
                         _set_alternate_mode($i, 3);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF4 mode
                     pub fn into_alternate_af4(
                         self,
-                    ) -> $PXi<Alternate<AF4>> {
+                    ) -> $PXi<IoMode, Alternate<AF4>> {
                         _set_alternate_mode($i, 4);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF5 mode
                     pub fn into_alternate_af5(
                         self,
-                    ) -> $PXi<Alternate<AF5>> {
+                    ) -> $PXi<IoMode, Alternate<AF5>> {
                         _set_alternate_mode($i, 5);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF6 mode
                     pub fn into_alternate_af6(
                         self,
-                    ) -> $PXi<Alternate<AF6>> {
+                    ) -> $PXi<IoMode, Alternate<AF6>> {
                         _set_alternate_mode($i, 6);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF7 mode
                     pub fn into_alternate_af7(
                         self,
-                    ) -> $PXi<Alternate<AF7>> {
+                    ) -> $PXi<IoMode, Alternate<AF7>> {
                         _set_alternate_mode($i, 7);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF8 mode
                     pub fn into_alternate_af8(
                         self,
-                    ) -> $PXi<Alternate<AF8>> {
+                    ) -> $PXi<IoMode, Alternate<AF8>> {
                         _set_alternate_mode($i, 8);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF9 mode
                     pub fn into_alternate_af9(
                         self,
-                    ) -> $PXi<Alternate<AF9>> {
+                    ) -> $PXi<IoMode, Alternate<AF9>> {
                         _set_alternate_mode($i, 9);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF10 mode
                     pub fn into_alternate_af10(
                         self,
-                    ) -> $PXi<Alternate<AF10>> {
+                    ) -> $PXi<IoMode, Alternate<AF10>> {
                         _set_alternate_mode($i, 10);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF11 mode
                     pub fn into_alternate_af11(
                         self,
-                    ) -> $PXi<Alternate<AF11>> {
+                    ) -> $PXi<IoMode, Alternate<AF11>> {
                         _set_alternate_mode($i, 11);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF12 mode
                     pub fn into_alternate_af12(
                         self,
-                    ) -> $PXi<Alternate<AF12>> {
+                    ) -> $PXi<IoMode, Alternate<AF12>> {
                         _set_alternate_mode($i, 12);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF13 mode
                     pub fn into_alternate_af13(
                         self,
-                    ) -> $PXi<Alternate<AF13>> {
+                    ) -> $PXi<IoMode, Alternate<AF13>> {
                         _set_alternate_mode($i, 13);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF14 mode
                     pub fn into_alternate_af14(
                         self,
-                    ) -> $PXi<Alternate<AF14>> {
+                    ) -> $PXi<IoMode, Alternate<AF14>> {
                         _set_alternate_mode($i, 14);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate in AF15 mode
                     pub fn into_alternate_af15(
                         self,
-                    ) -> $PXi<Alternate<AF15>> {
+                    ) -> $PXi<IoMode, Alternate<AF15>> {
                         _set_alternate_mode($i, 15);
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate as a floating input pin
                     pub fn into_floating_input(
                         self,
-                    ) -> $PXi<Input<Floating>> {
+                    ) -> $PXi<Input<Floating>, Alternate<AF0>> {
                         let offset = 2 * $i;
                         unsafe {
                             &(*$GPIOX::ptr()).moder.modify(|r, w| {
@@ -281,13 +282,13 @@ macro_rules! gpio {
                             &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b00 << offset))
                          })};
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate as a pulled down input pin
                     pub fn into_pull_down_input(
                         self,
-                        ) -> $PXi<Input<PullDown>> {
+                        ) -> $PXi<Input<PullDown>, Alternate<AF0>> {
                         let offset = 2 * $i;
                         unsafe {
                             &(*$GPIOX::ptr()).moder.modify(|r, w| {
@@ -296,13 +297,13 @@ macro_rules! gpio {
                             &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
                          })};
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate as a pulled up input pin
                     pub fn into_pull_up_input(
                         self,
-                    ) -> $PXi<Input<PullUp>> {
+                    ) -> $PXi<Input<PullUp>, Alternate<AF0>> {
                         let offset = 2 * $i;
                         unsafe {
                             &(*$GPIOX::ptr()).moder.modify(|r, w| {
@@ -312,13 +313,13 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
                          })};
 
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate as an open drain output pin
                     pub fn into_open_drain_output(
                         self,
-                    ) -> $PXi<Output<OpenDrain>> {
+                    ) -> $PXi<Output<OpenDrain>, Alternate<AF0>> {
                         let offset = 2 * $i;
                         unsafe {
                             &(*$GPIOX::ptr()).moder.modify(|r, w| {
@@ -332,13 +333,13 @@ macro_rules! gpio {
                          })};
 
 
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
 
                     /// Configures the pin to operate as an push pull output pin
                     pub fn into_push_pull_output(
                         self,
-                    ) -> $PXi<Output<PushPull>> {
+                    ) -> $PXi<Output<PushPull>, Alternate<AF0>> {
                         let offset = 2 * $i;
 
                         unsafe {
@@ -353,63 +354,51 @@ macro_rules! gpio {
                          })};
 
 
-                        $PXi { _mode: PhantomData }
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
                 }
 
-                impl $PXi<Output<OpenDrain>> {
+                impl<AlternateMode> $PXi<Output<OpenDrain>, AlternateMode> {
                     /// Enables / disables the internal pull up
-                    pub fn internal_pull_up(&mut self, on: bool) {
+                    pub fn internal_pull_up(&mut self, on: bool) -> $PXi<Output<PullUp>, AlternateMode>{
                         let offset = 2 * $i;
                         let value = if on { 0b01 } else { 0b00 };
                         unsafe {
                             &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
                                 w.bits((r.bits() & !(0b11 << offset)) | (value << offset))
-                         })};
+                        })};
+
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
                 }
 
-                impl<MODE> $PXi<Alternate<MODE>> {
-                    /// Enables / disables the internal pull up
-                    pub fn internal_pull_up(self, on: bool) -> Self {
-                        let offset = 2 * $i;
-                        let value = if on { 0b01 } else { 0b00 };
-                        unsafe {
-                            &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (value << offset))
-                         })};
-
-                        self
-                    }
-                }
-
-                impl<MODE> $PXi<Alternate<MODE>> {
+                impl<IoMode, AlternateMode> $PXi<IoMode, AlternateMode> {
                     /// Turns pin alternate configuration pin into open drain
-                    pub fn set_open_drain(self) -> Self {
+                    pub fn set_open_drain(self) -> $PXi<Output<OpenDrain>, AlternateMode> {
                         let offset = $i;
                         unsafe {
                             &(*$GPIOX::ptr()).otyper.modify(|r, w| {
                                 w.bits(r.bits() & (1 << offset))
                          })};
 
-                        self
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
                 }
 
-                impl<MODE> $PXi<Output<MODE>> {
+                impl<OutputMode, AlternateMode> $PXi<Output<OutputMode>, AlternateMode> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
                     /// need all the elements to have the same type
-                    pub fn downgrade(self) -> $PXx<Output<MODE>> {
+                    pub fn downgrade(self) -> $PXx<Output<OutputMode>> {
                         $PXx {
                             i: $i,
-                            _mode: self._mode,
+                            _mode: self._io_mode,
                         }
                     }
                 }
 
-                impl<MODE> OutputPin for $PXi<Output<MODE>> {
+                impl<OutputMode> OutputPin for $PXi<Output<OutputMode>, Alternate<AF0>> {
                     fn set_high(&mut self) {
                         unsafe { (*$GPIOX::ptr()).bsrr.write(|w| w.bits(1 << $i)) }
                     }
@@ -419,20 +408,20 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> $PXi<Input<MODE>> {
+                impl<InputMode, AlternateMode> $PXi<Input<InputMode>, AlternateMode> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
                     /// need all the elements to have the same type
-                    pub fn downgrade(self) -> $PXx<Input<MODE>> {
+                    pub fn downgrade(self) -> $PXx<Input<InputMode>> {
                         $PXx {
                             i: $i,
-                            _mode: self._mode,
+                            _mode: self._io_mode,
                         }
                     }
                 }
 
-                impl<MODE> InputPin for $PXi<Input<MODE>> {
+                impl<InputMode> InputPin for $PXi<Input<InputMode>, Alternate<AF0>> {
                     fn is_high(&self) -> bool {
                         !self.is_low()
                     }
