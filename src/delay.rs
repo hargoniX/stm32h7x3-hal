@@ -1,3 +1,4 @@
+//! Delay implementation
 // taken from  https://github.com/japaric/stm32f30x-hal
 use cast::u32;
 use cortex_m::peripheral::syst::SystClkSource;

@@ -1,3 +1,5 @@
+//! System Window Watchdog implementation
+
 use stm32h7::stm32h7x3::WWDG;
 use embedded_hal::watchdog::{Watchdog, WatchdogEnable};
 use cast::u8;

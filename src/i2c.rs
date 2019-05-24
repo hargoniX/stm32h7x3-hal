@@ -1,3 +1,4 @@
+//! Inter Integrated Circuit implementation
 // I2C implementation, largely taken over from japaric's HAL like so many other features here
 
 use crate::gpio::gpioa::PA8;
@@ -6,7 +7,7 @@ use crate::gpio::gpioc::PC9;
 use crate::gpio::gpiod::{PD12, PD13};
 use crate::gpio::gpiof::{PF0, PF1, PF14, PF15};
 use crate::gpio::gpioh::{PH11, PH12, PH4, PH5, PH7, PH8};
-use crate::gpio::{Alternate,AF4, Output, OpenDrain};
+use crate::gpio::{AF4, Output, OpenDrain};
 use crate::rcc::{Clocks, APB1L, APB4};
 use crate::time::Hertz;
 use hal::blocking::i2c::{Write, WriteRead, Read};
@@ -36,44 +37,43 @@ pub unsafe trait SclPin<I2C> {}
 pub unsafe trait SdaPin<I2C> {}
 
 // I2C1_SCL
-unsafe impl SclPin<I2C1> for PB6<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C1> for PB8<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C1> for PB8<Output<OpenDrain>, AF4> {}
 
 // I2C1_SDA
-unsafe impl SdaPin<I2C1> for PB7<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C1> for PB9<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C1> for PB7<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C1> for PB9<Output<OpenDrain>, AF4> {}
 
 // I2C2_SCL
-unsafe impl SclPin<I2C2> for PB10<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C2> for PF1<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C2> for PH4<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C2> for PB10<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C2> for PF1<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C2> for PH4<Output<OpenDrain>, AF4> {}
 
 // I2C2_SDA
-unsafe impl SdaPin<I2C2> for PB11<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C2> for PF0<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C2> for PH5<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C2> for PB11<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C2> for PF0<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C2> for PH5<Output<OpenDrain>, AF4> {}
 
 // I2C3_SCL
-unsafe impl SclPin<I2C3> for PA8<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C3> for PH7<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C3> for PA8<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C3> for PH7<Output<OpenDrain>, AF4> {}
 
 // I2C3_SDA
-unsafe impl SdaPin<I2C3> for PC9<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C3> for PH8<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C3> for PC9<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C3> for PH8<Output<OpenDrain>, AF4> {}
 
 // I2C4_SCL
-unsafe impl SclPin<I2C4> for PD12<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PF14<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PH11<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PB6<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SclPin<I2C4> for PB8<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SclPin<I2C4> for PD12<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C4> for PF14<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C4> for PH11<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C4> for PB6<Output<OpenDrain>, AF4> {}
+unsafe impl SclPin<I2C4> for PB8<Output<OpenDrain>, AF4> {}
 
 // I2C4_SDA
-unsafe impl SdaPin<I2C4> for PB7<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PB9<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PD13<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PF15<Output<OpenDrain>, Alternate<AF4>> {}
-unsafe impl SdaPin<I2C4> for PH12<Output<OpenDrain>, Alternate<AF4>> {}
+unsafe impl SdaPin<I2C4> for PB7<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C4> for PB9<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C4> for PD13<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C4> for PF15<Output<OpenDrain>, AF4> {}
+unsafe impl SdaPin<I2C4> for PH12<Output<OpenDrain>, AF4> {}
 
 pub struct I2c<I2C, PINS> {
     i2c: I2C,
@@ -99,9 +99,10 @@ macro_rules! busy_wait {
 }
 
 macro_rules! i2c {
-    ($($I2CX:ident: ($i2cX:ident, $i2cXen:ident, $i2cXrst:ident, $APBX:ident),)+) => {
+    ($($I2CX:ident: ($i2cX:ident, $i2cXen:ident, $i2cXrst:ident, $APBX:ident, $PCLKX:ident),)+) => {
         $(
             impl<SCL, SDA> I2c<$I2CX, (SCL, SDA)> {
+                /// Basically a new function for the I2C peripheral
                 pub fn $i2cX<F> (
                     i2c: $I2CX,
                     pins: (SCL, SDA),
@@ -121,7 +122,7 @@ macro_rules! i2c {
 
                     assert!(freq <= 1_000_000);
 
-                    let i2cclk = clocks.pclk4();    
+                    let i2cclk = clocks.$PCLKX().0;    
 
                     // Refer to figure 539 for this:
                     // Clear PE bit in I2C_CR1
@@ -140,7 +141,6 @@ macro_rules! i2c {
                     //
                     // t_SYNC1 + t_SYNC2 > 4 * t_I2CCLK
                     // t_SCL ~= t_SYNC1 + t_SYNC2 + t_SCLL + t_SCLH
-                    let i2cclk = clocks.pclk1().0;
                     let ratio = i2cclk / freq - 4;
                     let (presc, scll, sclh, sdadel, scldel) = if freq > 100_000 {
                         // fast-mode or fast-mode plus
@@ -188,7 +188,7 @@ macro_rules! i2c {
                     let scll = u8(scll).unwrap();
 
                     // Configure for "fast mode" (400 KHz)
-                    i2c.timingr.write(|w| unsafe {
+                    i2c.timingr.write(|w| 
                         w.presc()
                             .bits(presc)
                             .scll()
@@ -199,7 +199,7 @@ macro_rules! i2c {
                             .bits(sdadel)
                             .scldel()
                             .bits(scldel)
-                    });
+                    );
 
                     // Enable the peripheral
                     i2c.cr1.write(|w| w.pe().set_bit());
@@ -370,8 +370,8 @@ macro_rules! i2c {
 }
 
 i2c!(
-    I2C1: (i2c1, i2c1en, i2c1rst, APB1L),
-    I2C2: (i2c2, i2c2en, i2c2rst, APB1L),
-    I2C3: (i2c3, i2c3en, i2c3rst, APB1L),
-    I2C4: (i2c4, i2c4en, i2c4rst, APB4),
+    I2C1: (i2c1, i2c1en, i2c1rst, APB1L, pclk1),
+    I2C2: (i2c2, i2c2en, i2c2rst, APB1L, pclk4),
+    I2C3: (i2c3, i2c3en, i2c3rst, APB1L, pclk4),
+    I2C4: (i2c4, i2c4en, i2c4rst, APB4, pclk4),
 );
