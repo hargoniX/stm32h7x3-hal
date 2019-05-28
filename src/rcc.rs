@@ -1,3 +1,5 @@
+//! Reset and clock control implementation
+
 use stm32h7::stm32h7x3::{rcc, RCC};
 use cast::{u8, u16};
 use crate::time::Hertz;
@@ -66,15 +68,19 @@ pub struct Rcc {
 macro_rules! ahb {
     ($($AHBx:ident: ($ahbx:ident, $AHBXENR:ident, $ahbxenr:ident, $AHBXRSTR:ident, $ahbxrstr:ident),)+) => {
         $(
+
+            /// A simple struct for providing safe APIs to the registers of the AHB busses
             pub struct $AHBx {
                 _0: (),
             }
 
             impl $AHBx {
+                /// Provides acces to the enr register of the AHB
                 pub(crate) fn enr(&mut self) -> &rcc::$AHBXENR {
                     unsafe {&(*RCC::ptr()).$ahbxenr}
                 }
 
+                /// Provides access to the rstr register of the AHB
                 pub(crate) fn rstr(&mut self) -> &rcc::$AHBXRSTR {
                     unsafe {&(*RCC::ptr()).$ahbxrstr}
                 }
@@ -86,15 +92,19 @@ macro_rules! ahb {
 macro_rules! apb {
     ($($APBx:ident: ($apbx:ident, $APBXENR:ident, $apbxenr:ident, $APBXRSTR:ident, $apbxrstr:ident),)+) => {
         $(
+
+            /// A simple struct providing safe APIs to the regsiters of the APB busses
             pub struct $APBx {
                 _0: (),
             }
 
             impl $APBx {
+                /// Provides access to the enr register of the APB
                 pub(crate) fn enr(&mut self) -> &rcc::$APBXENR {
                     unsafe {&(*RCC::ptr()).$apbxenr}
                 }
 
+                // Provides access to the rstr register of the APB
                 pub(crate) fn rstr(&mut self) -> &rcc::$APBXRSTR {
                     unsafe {&(*RCC::ptr()).$apbxrstr}
                 }
@@ -122,17 +132,29 @@ const HSI: u32 = 64_000_000; // Hz
 
 /// Clock configuration
 pub struct CFGR {
+    /// The clock of AHB1
     hclk1: Option<u32>,
+    /// The clock of AHB2
     hclk2: Option<u32>,
+    /// The clock of AHB3
     hclk3: Option<u32>,
+    /// The clock of AHB4
     hclk4: Option<u32>,
+    /// The clock of APB1
     pclk1: Option<u32>,
+    /// The clock of APB2
     pclk2: Option<u32>,
+    /// The clock of APB3
     pclk3: Option<u32>,
+    /// The clock of APB4
     pclk4: Option<u32>,
+    /// The system clock
     sys_ck: Option<u32>,
+    /// The divm divider of the pll1
     divm: Option<u32>,
+    /// The divn divider of the pll1
     divn: Option<u32>,
+    /// The dip divider of the pll1
     divp: Option<u32>,
 }
 
@@ -385,10 +407,7 @@ impl CFGR {
 
             // calculate and set the bits for the VCOSEL register
             // if the frequency of ref_ck is < 2 Mhz and > 1 Mhz set to 1 otherwise to 0
-            let mut vcosel_bit = false;
-            if ref_ck < 2_000_000 {
-                vcosel_bit = true;
-            }
+            let vcosel_bit = if ref_ck < 2_000_000 { true } else { false };
             rcc.pllcfgr.modify(|_, w| w.pll1vcosel().bit(vcosel_bit));
 
             rcc.pll1divr.modify(|_, w| unsafe {w.divp1().bits(u8(self.divp.unwrap_or(0b0000001)).unwrap())});
@@ -434,72 +453,87 @@ impl CFGR {
 /// The existence of this value indicates that the clock configuration can no longer be changed
 #[derive(Clone, Copy)]
 pub struct Clocks {
+    /// The system clock frequency
     sys_ck: Hertz,
+    /// The APB1 bus frequency
     pclk1: Hertz,
+    /// The APB2 bus frequency
     pclk2: Hertz,
+    /// The APB3 bus frequency
     pclk3: Hertz,
+    /// The APB4 bus frequency
     pclk4: Hertz,
+    /// The AHB1 bus frequency
     hclk1: Hertz,
+    /// The AHB2 bus frequency
     hclk2: Hertz,
+    /// The AHB3 bus frequency
     hclk3: Hertz,
+    /// The AHB4 bus frequency
     hclk4: Hertz,
+    /// The divider for all the AHB busses
     hpre: u8,
+    /// The APB3 divider
     d1ppre: u8,
+    /// The APB1 divider
     d2ppre1: u8,
+    /// The APB2 divider
     d2ppre2: u8,
+    /// The APB4 divider
     d3ppre: u8,
 }
 
 
 impl Clocks {
+    /// Getter for sys_ck
     pub fn sys_ck(&self) -> Hertz {
         self.sys_ck
     }
-
+    /// Getter for pclk1
     pub fn pclk1(&self) -> Hertz {
         self.pclk1
     }
-
+    /// Getter for pclk2
     pub fn pclk2(&self) -> Hertz {
         self.pclk2
     }
-
+    /// Getter for pclk3
     pub fn pclk3(&self) -> Hertz {
         self.pclk3
     }
-
+    /// Getter for pclk4
     pub fn pclk4(&self) -> Hertz {
         self.pclk4
     }
-
+    /// Getter for hclk1
     pub fn hclk1(&self) -> Hertz {
         self.hclk1
     }
-
+    /// Getter for hclk2
     pub fn hclk2(&self) -> Hertz {
         self.hclk2
     }
-
+    /// Getter for hclk3
     pub fn hclk3(&self) -> Hertz {
         self.hclk3
     }
-
+    /// Getter for hclk4
     pub fn hclk4(&self) -> Hertz {
         self.hclk4
     }
-
+    /// Getter for d1ppre
     pub fn d1ppre(&self) -> u8 {
         self.d1ppre
     }
-
+    /// Getter for de2ppre1
     pub fn d2ppre1(&self) -> u8 {
         self.d2ppre1
     }
-
+    /// Getter for d2ppre2
     pub fn d2ppre2(&self) -> u8 {
         self.d2ppre2
     }
-
+    /// Getter for d3ppre
     pub fn d3ppre(&self) -> u8 {
         self.d3ppre
     }
