@@ -14,6 +14,7 @@ steps:
     curl https://sh.rustup.rs -sSf | sh -s -- -y
     source $HOME/.cargo/env
     rustup default nightly
+    rustup target add thumbv7em-none-eabihf
   displayName: 'Install rust nightly'
 - script: |
     source $HOME/.cargo/env
