@@ -15,7 +15,7 @@ use crate::gpio::gpioh::{PH6, PH7};
 use crate::gpio::gpioi::{PI1, PI2, PI3};
 use crate::gpio::gpioj::{PJ10, PJ11};
 use crate::gpio::gpiok::{PK0};
-use crate::gpio::{AF5, AF6, AF7, AF8, Output, Input, PushPull, OpenDrain};
+use crate::gpio::{AF5, AF6, AF7, AF8, Output, Input, PushPull, Floating};
 use crate::time::Hertz;
 use crate::rcc::{APB1L, APB2, APB4, Clocks};
 
@@ -90,28 +90,28 @@ unsafe impl MosiPin<SPI6> for PB5<Output<PushPull>, AF8> {}
 unsafe impl MosiPin<SPI6> for PG14<Output<PushPull>, AF5> {}
 
 // All MISO pins for SPI1
-unsafe impl MisoPin<SPI1> for PA6<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI1> for PG9<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI1> for PB4<Input<OpenDrain>, AF5> {}
+unsafe impl MisoPin<SPI1> for PA6<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI1> for PG9<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI1> for PB4<Input<Floating>, AF5> {}
 
 // All MISO pins for SPI2
-unsafe impl MisoPin<SPI2> for PC2<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI2> for PB14<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI2> for PI2<Input<OpenDrain>, AF5> {}
+unsafe impl MisoPin<SPI2> for PC2<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI2> for PB14<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI2> for PI2<Input<Floating>, AF5> {}
 
-unsafe impl MisoPin<SPI3> for PC11<Input<OpenDrain>, AF6> {}
-unsafe impl MisoPin<SPI3> for PB4<Input<OpenDrain>, AF6> {}
+unsafe impl MisoPin<SPI3> for PC11<Input<Floating>, AF6> {}
+unsafe impl MisoPin<SPI3> for PB4<Input<Floating>, AF6> {}
 
-unsafe impl MisoPin<SPI4> for PE5<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI4> for PE13<Input<OpenDrain>, AF5> {}
+unsafe impl MisoPin<SPI4> for PE5<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI4> for PE13<Input<Floating>, AF5> {}
 
-unsafe impl MisoPin<SPI5> for PF8<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI5> for PH7<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI5> for PJ11<Input<OpenDrain>, AF5> {}
+unsafe impl MisoPin<SPI5> for PF8<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI5> for PH7<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI5> for PJ11<Input<Floating>, AF5> {}
 
-unsafe impl MisoPin<SPI6> for PA6<Input<OpenDrain>, AF8> {}
-unsafe impl MisoPin<SPI6> for PG12<Input<OpenDrain>, AF5> {}
-unsafe impl MisoPin<SPI6> for PB4<Input<OpenDrain>, AF8> {}
+unsafe impl MisoPin<SPI6> for PA6<Input<Floating>, AF8> {}
+unsafe impl MisoPin<SPI6> for PG12<Input<Floating>, AF5> {}
+unsafe impl MisoPin<SPI6> for PB4<Input<Floating>, AF8> {}
 
 #[derive(Debug)]
 pub enum Error {
