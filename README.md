@@ -6,7 +6,7 @@ This crate provides an embedded-hal implementation for the stm32h7x3 chip series
 - [x] GPIO
 - [x] Watchdog
 - [ ] SPI
-- [ ] UART
+- [x] UART
 - [ ] PWM
 - [ ] ADC
 - [ ] SDMMC
