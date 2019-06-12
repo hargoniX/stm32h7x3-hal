@@ -57,6 +57,9 @@ pub struct OpenDrain;
 /// Push pull output (type state)
 pub struct PushPull;
 
+/// Analog input (type state)
+pub struct Analog;
+
 macro_rules! gpio {
     ($GPIOX:ident, $gpiox:ident, $iopxenr:ident, $PXx:ident, [
         $($PXi:ident: ($pxi:ident, $i:expr, $MODE:ty),)+
@@ -351,6 +354,23 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b1 << $i))
                          })};
 
+
+                        $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
+                    }
+
+                    /// Configures the pin to operate as an analog input pin
+                    pub fn into_analog(
+                        self,
+                    ) -> $PXi<Analog, AF0> {
+                        let offset = 2 * $i;
+                        // Analog mode
+                        let mode = 0b11;
+                        
+                        unsafe {
+                            &(*$GPIOX::ptr()).moder.modify(|r, w| {
+                                w.bits((r.bits() & !(0b11 << offset)) | mode << offset)
+                            });
+                        }
 
                         $PXi {_io_mode: PhantomData, _af_mode: PhantomData,}
                     }
