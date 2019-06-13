@@ -236,6 +236,8 @@ macro_rules! adc_hal {
                     s.power_up();
                     s.disable();
                     s.calibrate();
+                    s.enable();
+                    s.disable();
                     s.power_down();
                     s
                 }
@@ -309,7 +311,7 @@ macro_rules! adc_hal {
                 fn enable(&mut self) {
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                     self.rb.cr.modify(|_, w| w.aden().set_bit());
-                    while !self.rb.isr.read().adrdy().bit_is_set() {}
+                    while self.rb.isr.read().adrdy().bit_is_clear() {}
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                 }
 
@@ -399,6 +401,9 @@ macro_rules! adc_hal {
 
                     // Wait until conversion finished
                     while self.rb.isr.read().eos().bit_is_clear() {}
+
+                    // Cleanup
+                    self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
 
                     // Retrieve result
                     let result = self.rb.dr.read().bits();
