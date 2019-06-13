@@ -40,7 +40,7 @@ fn main() -> ! {
     let gpiob = p.GPIOB.split(&mut rcc.ahb4);
 
     // Configure pb0, pb1 as an analog input
-    let mut ch0 = gpiob.pb0.into_analog();
+    let mut ch0 = gpiob.pb1.into_analog();
 
     loop {
         let data: u32 = adc1.read(&mut ch0).unwrap();
