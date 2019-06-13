@@ -1,6 +1,6 @@
 use embedded_hal::adc::{Channel, OneShot};
 use stm32h7::stm32h7x3::{ADC1, ADC2, ADC3};
-use stm32h7::stm32h7x3::rcc::{AHB1RSTR, AHB1ENR};
+// use stm32h7::stm32h7x3::rcc::{AHB1RSTR, AHB1ENR, AHB4RSTR, AHB4ENR};
 
 use crate::gpio::{Analog, AF0};
 use crate::gpio::gpioa::{PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7};
@@ -8,16 +8,17 @@ use crate::gpio::gpiob::{PB0, PB1};
 use crate::gpio::gpioc::{PC0, PC1, PC2, PC3, PC4, PC5};
 use crate::gpio::gpiof::{PF3, PF4, PF5, PF6, PF7, PF8, PF9, PF10, PF11, PF12, PF13, PF14};
 use crate::gpio::gpioh::{PH2, PH3, PH4, PH5};
-use crate::time::Hertz;
 use crate::delay::Delay;
+use crate::rcc::{AHB1, AHB4};
 
 use hal::blocking::delay::DelayUs;
 
-pub struct Adc<ADC> {
+pub struct Adc<'a, ADC> {
     rb: ADC,
     sample_time: AdcSampleTime,
     align: AdcAlign,
     resolution: AdcSampleResolution,
+    delay: &'a mut Delay,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -85,11 +86,11 @@ impl AdcSampleResolution {
 impl From<AdcSampleResolution> for u8 {
     fn from(val: AdcSampleResolution) -> u8 {
         match val {
-            AdcSampleResolution::B_16 => 0,
-            AdcSampleResolution::B_14 => 1,
-            AdcSampleResolution::B_12 => 2,
-            AdcSampleResolution::B_10 => 3,
-            AdcSampleResolution::B_8 => 4,
+            AdcSampleResolution::B_16 => 0b000,
+            AdcSampleResolution::B_14 => 0b001,
+            AdcSampleResolution::B_12 => 0b010,
+            AdcSampleResolution::B_10 => 0b011,
+            AdcSampleResolution::B_8 => 0b111,
         }
     }
 }
@@ -211,31 +212,31 @@ macro_rules! adc_hal {
             $init:ident,
             $adcxen:ident,
             $adcxrst:ident,
-            $RSTR:ident,
-            $ENR:ident
-        ),
+            $AHB:ident
+        ) $(,)*
     )+) => {
         $(
-            impl Adc<$ADC> {
+            impl<'a> Adc<'a, $ADC> {
                 /// Init a new Adc
                 ///
                 /// Sets all configurable parameters to one-shot defaults,
                 /// performs a boot-time calibration.
-                pub fn $init(adc: $ADC, rstr: &mut $RSTR, enr: &mut $ENR, clk: Hertz, delay: &mut Delay) -> Self {
+                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &'a mut Delay) -> Self {
                     let mut s = Self {
                         rb: adc,
                         sample_time: AdcSampleTime::default(),
                         align: AdcAlign::default(),
                         resolution: AdcSampleResolution::default(),
+                        delay,
                     };
-                    s.enable_clock(enr);
+                    s.enable_clock(ahb);
                     s.power_down();
-                    s.reset(rstr);
+                    s.reset(ahb);
                     s.configure();
-                    s.power_up(delay);
+                    s.power_up();
                     s.disable();
                     s.calibrate();
-                    s.enable();
+                    s.power_down();
                     s
                 }
 
@@ -282,20 +283,20 @@ macro_rules! adc_hal {
                 }
 
                 /// Returns the largest possible sample value for the current settings
-                pub fn max_sample(&self) -> u16 {
+                pub fn max_sample(&self) -> u32 {
                     match self.align {
                         // AdcAlign::Left => u16::max_value(),
-                        AdcAlign::Left => u16::max_value() << (16 - self.resolution as u16),
-                        AdcAlign::Right => (1 << self.resolution as u16) - 1,
+                        AdcAlign::Left => u32::max_value() << (32 - self.resolution as u32),
+                        AdcAlign::Right => (1 << self.resolution as u32) - 1,
                     }
                 }
 
-                fn power_up(&mut self, delay: &mut Delay) {
+                fn power_up(&mut self) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().clear_bit()
                             .advregen().set_bit()
                     );
-                    delay.delay_us(10_u8);
+                    self.delay.delay_us(10_u8);
                 }
 
                 fn power_down(&mut self) {
@@ -313,7 +314,7 @@ macro_rules! adc_hal {
                 }
 
                 fn disable(&mut self) {
-                    if !self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
+                    if self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
                         self.rb.cr.modify(|_, w|
                             w.adstp().set_bit()
                                 .jadstp().set_bit()
@@ -325,17 +326,23 @@ macro_rules! adc_hal {
                     while self.rb.cr.read().aden().bit_is_set() {}
                 }
 
-                fn reset(&mut self, rstr: &mut $RSTR) {
-                    rstr.modify(|_, w| w.$adcxrst().set_bit());
+                fn reset(&mut self, ahb: &mut $AHB) {
+                    ahb.rstr().modify(|_, w| w.$adcxrst().set_bit());
                 }
 
-                fn enable_clock(&mut self, enr: &mut $ENR) {
-                    enr.modify(|_, w| w.$adcxen().set_bit());
+                fn enable_clock(&mut self, ahb: &mut $AHB) {
+                    ahb.enr().modify(|_, w| w.$adcxen().set_bit());
                 }
 
                 fn configure(&mut self) {
-                    // Single conversion mode
-                    self.rb.cfgr.modify(|_, w| w.cont().clear_bit());
+                    // Single conversion mode, Software trigger (no hardware trigger), context queue enabled
+                    self.rb.cfgr.modify(|_, w| unsafe {
+                        w.cont().clear_bit()
+                            .exten().bits(0x0)
+                            .jqdis().clear_bit()
+                            .discen().set_bit()
+                    });
+                    self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0x0) });
                 }
 
                 fn calibrate(&mut self) {
@@ -351,31 +358,72 @@ macro_rules! adc_hal {
 
                 fn set_chan_smps(&mut self, chan: u8) {
                     match chan {
-                        1 => self.rb.smpr1.modify(|_, w| unsafe {w.smp1().bits(self.sample_time.into())}),
-                        2 => self.rb.smpr1.modify(|_, w| unsafe {w.smp2().bits(self.sample_time.into())}),
-                        3 => self.rb.smpr1.modify(|_, w| unsafe {w.smp3().bits(self.sample_time.into())}),
-                        4 => self.rb.smpr1.modify(|_, w| unsafe {w.smp4().bits(self.sample_time.into())}),
-                        5 => self.rb.smpr1.modify(|_, w| unsafe {w.smp5().bits(self.sample_time.into())}),
-                        6 => self.rb.smpr1.modify(|_, w| unsafe {w.smp6().bits(self.sample_time.into())}),
-                        7 => self.rb.smpr1.modify(|_, w| unsafe {w.smp7().bits(self.sample_time.into())}),
-                        8 => self.rb.smpr1.modify(|_, w| unsafe {w.smp8().bits(self.sample_time.into())}),
-                        9 => self.rb.smpr1.modify(|_, w| unsafe {w.smp9().bits(self.sample_time.into())}),
-                        10 => self.rb.smpr2.modify(|_, w| unsafe {w.smp10().bits(self.sample_time.into())}),
-                        11 => self.rb.smpr2.modify(|_, w| unsafe {w.smp11().bits(self.sample_time.into())}),
-                        12 => self.rb.smpr2.modify(|_, w| unsafe {w.smp12().bits(self.sample_time.into())}),
-                        13 => self.rb.smpr2.modify(|_, w| unsafe {w.smp13().bits(self.sample_time.into())}),
-                        14 => self.rb.smpr2.modify(|_, w| unsafe {w.smp14().bits(self.sample_time.into())}),
-                        15 => self.rb.smpr2.modify(|_, w| unsafe {w.smp15().bits(self.sample_time.into())}),
-                        16 => self.rb.smpr2.modify(|_, w| unsafe {w.smp16().bits(self.sample_time.into())}),
-                        17 => self.rb.smpr2.modify(|_, w| unsafe {w.smp17().bits(self.sample_time.into())}),
-                        18 => self.rb.smpr2.modify(|_, w| unsafe {w.smp18().bits(self.sample_time.into())}),
-                        19 => self.rb.smpr2.modify(|_, w| unsafe {w.smp19().bits(self.sample_time.into())}),
+                        1 => self.rb.smpr1.modify(|_, w| unsafe { w.smp1().bits(self.sample_time.into()) }),
+                        2 => self.rb.smpr1.modify(|_, w| unsafe { w.smp2().bits(self.sample_time.into()) }),
+                        3 => self.rb.smpr1.modify(|_, w| unsafe { w.smp3().bits(self.sample_time.into()) }),
+                        4 => self.rb.smpr1.modify(|_, w| unsafe { w.smp4().bits(self.sample_time.into()) }),
+                        5 => self.rb.smpr1.modify(|_, w| unsafe { w.smp5().bits(self.sample_time.into()) }),
+                        6 => self.rb.smpr1.modify(|_, w| unsafe { w.smp6().bits(self.sample_time.into()) }),
+                        7 => self.rb.smpr1.modify(|_, w| unsafe { w.smp7().bits(self.sample_time.into()) }),
+                        8 => self.rb.smpr1.modify(|_, w| unsafe { w.smp8().bits(self.sample_time.into()) }),
+                        9 => self.rb.smpr1.modify(|_, w| unsafe { w.smp9().bits(self.sample_time.into()) }),
+                        10 => self.rb.smpr2.modify(|_, w| unsafe { w.smp10().bits(self.sample_time.into()) }),
+                        11 => self.rb.smpr2.modify(|_, w| unsafe { w.smp11().bits(self.sample_time.into()) }),
+                        12 => self.rb.smpr2.modify(|_, w| unsafe { w.smp12().bits(self.sample_time.into()) }),
+                        13 => self.rb.smpr2.modify(|_, w| unsafe { w.smp13().bits(self.sample_time.into()) }),
+                        14 => self.rb.smpr2.modify(|_, w| unsafe { w.smp14().bits(self.sample_time.into()) }),
+                        15 => self.rb.smpr2.modify(|_, w| unsafe { w.smp15().bits(self.sample_time.into()) }),
+                        16 => self.rb.smpr2.modify(|_, w| unsafe { w.smp16().bits(self.sample_time.into()) }),
+                        17 => self.rb.smpr2.modify(|_, w| unsafe { w.smp17().bits(self.sample_time.into()) }),
+                        18 => self.rb.smpr2.modify(|_, w| unsafe { w.smp18().bits(self.sample_time.into()) }),
+                        19 => self.rb.smpr2.modify(|_, w| unsafe { w.smp19().bits(self.sample_time.into()) }),
                         _ => unreachable!(),
                     }
                 }
 
-                fn convert(&mut self, chan: u8) -> u16 {
+                fn convert(&mut self, chan: u8) -> u32 {
+                    assert!(chan <= 19);
+                    // Ensure that no conversions are ongoing
+                    assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());
+
+                    // Select channel
+                    self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
+                    self.set_chan_smps(chan);
+                    self.rb.sqr1.modify(|_, w| unsafe { 
+                        w.sq1().bits(chan)
+                            .l3().bits(0)
+                    });
+
+                    // Perform conversion
                     self.rb.cr.modify(|_, w| w.adstart().set_bit());
+
+                    // Wait until conversion finished
+                    while self.rb.isr.read().eos().bit_is_clear() {}
+
+                    // Retrieve result
+                    let result = self.rb.dr.read().bits();
+                    result
+                }
+
+                pub fn free(self) -> (&'a mut Delay, $ADC) {
+                    (self.delay, self.rb)
+                }
+            }
+
+            impl<WORD, PIN> OneShot<$ADC, WORD, PIN> for Adc<'_, $ADC>
+            where
+                WORD: From<u32>, 
+                PIN: Channel<$ADC, ID = u8>,
+            {
+                type Error = ();
+
+                fn read(&mut self, _pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
+                    self.power_up();
+                    self.enable();
+                    let res = self.convert(PIN::channel());
+                    self.disable();
+                    self.power_down();
+                    Ok(res.into())
                 }
             }
         )+
@@ -387,8 +435,19 @@ adc_hal! {
         adc1,
         adc12en,
         adc12rst,
-        AHB1RSTR,
-        AHB1ENR
+        AHB1
+    ),
+    ADC2: (
+        adc2,
+        adc12en,
+        adc12rst,
+        AHB1
+    ),
+    ADC3: (
+        adc3,
+        adc3en,
+        adc3rst,
+        AHB4
     ),
 }
 
