@@ -343,6 +343,7 @@ macro_rules! adc_hal {
                             .exten().bits(0x0)
                             .jqdis().clear_bit()
                             .discen().set_bit()
+                            .res().bits(self.resolution.into())
                     });
                     self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0x0) });
                 }
