@@ -212,8 +212,8 @@ macro_rules! adc_hal {
             $adcxen:ident,
             $adcxrst:ident,
             $AHB:ident
-        ) $(,)*
-    )+) => {
+        )
+    ),+ $(,)*) => {
         $(
             impl Adc<$ADC> {
                 /// Init a new Adc
