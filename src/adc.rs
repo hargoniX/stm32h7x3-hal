@@ -43,6 +43,12 @@ pub enum AdcSampleTime {
     T_810,
 }
 
+impl AdcSampleTime {
+    pub fn default() -> Self {
+        AdcSampleTime::T_32
+    }
+}
+
 impl From<AdcSampleTime> for u8 {
     fn from(val: AdcSampleTime) -> u8 {
         match val {
@@ -91,12 +97,6 @@ impl From<AdcSampleResolution> for u8 {
             AdcSampleResolution::B_10 => 0b011,
             AdcSampleResolution::B_8 => 0b111,
         }
-    }
-}
-
-impl AdcSampleTime {
-    pub fn default() -> Self {
-        AdcSampleTime::T_32
     }
 }
 
