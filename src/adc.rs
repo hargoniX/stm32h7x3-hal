@@ -349,11 +349,11 @@ macro_rules! adc_hal {
 
                 fn reset(&mut self, ahb: &mut $AHB) {
                     ahb.rstr().modify(|_, w| w.$adcxrst().set_bit());
+                    ahb.rstr().modify(|_, w| w.$adcxrst().clear_bit());
                 }
 
                 fn enable_clock(&mut self, ahb: &mut $AHB) {
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
-                    ahb.enr().modify(|_, w| w.$adcxen().clear_bit());
                 }
 
                 fn configure(&mut self) {
