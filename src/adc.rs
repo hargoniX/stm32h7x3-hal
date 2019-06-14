@@ -1,6 +1,5 @@
 use embedded_hal::adc::{Channel, OneShot};
 use stm32h7::stm32h7x3::{ADC1, ADC2, ADC3};
-// use stm32h7::stm32h7x3::rcc::{AHB1RSTR, AHB1ENR, AHB4RSTR, AHB4ENR};
 
 use crate::gpio::{Analog, AF0};
 use crate::gpio::gpioa::{PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7};
@@ -13,12 +12,11 @@ use crate::rcc::{AHB1, AHB4};
 
 use hal::blocking::delay::DelayUs;
 
-pub struct Adc<'a, ADC> {
+pub struct Adc<ADC> {
     rb: ADC,
     sample_time: AdcSampleTime,
     align: AdcAlign,
     resolution: AdcSampleResolution,
-    delay: &'a mut Delay,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -48,19 +46,20 @@ pub enum AdcSampleTime {
 impl From<AdcSampleTime> for u8 {
     fn from(val: AdcSampleTime) -> u8 {
         match val {
-            AdcSampleTime::T_1 => 0,
-            AdcSampleTime::T_2 => 1,
-            AdcSampleTime::T_8 => 2,
-            AdcSampleTime::T_16 => 3,
-            AdcSampleTime::T_32 => 4,
-            AdcSampleTime::T_64 => 5,
-            AdcSampleTime::T_387 => 6,
-            AdcSampleTime::T_810 => 7,
+            AdcSampleTime::T_1 => 0b000,
+            AdcSampleTime::T_2 => 0b001,
+            AdcSampleTime::T_8 => 0b010,
+            AdcSampleTime::T_16 => 0b011,
+            AdcSampleTime::T_32 => 0b100,
+            AdcSampleTime::T_64 => 0b101,
+            AdcSampleTime::T_387 => 0b110,
+            AdcSampleTime::T_810 => 0b111,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(non_camel_case_types)]
 /// ADC sampling resolution
 /// 
 /// Options for sampling resolution
@@ -216,29 +215,26 @@ macro_rules! adc_hal {
         ) $(,)*
     )+) => {
         $(
-            impl<'a> Adc<'a, $ADC> {
+            impl Adc<$ADC> {
                 /// Init a new Adc
                 ///
                 /// Sets all configurable parameters to one-shot defaults,
                 /// performs a boot-time calibration.
-                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &'a mut Delay) -> Self {
+                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &mut Delay) -> Self {
                     let mut s = Self {
                         rb: adc,
                         sample_time: AdcSampleTime::default(),
                         align: AdcAlign::default(),
                         resolution: AdcSampleResolution::default(),
-                        delay,
                     };
                     s.enable_clock(ahb);
                     s.power_down();
                     s.reset(ahb);
                     s.configure();
-                    s.power_up();
+                    s.power_up(delay);
                     s.disable();
                     s.calibrate();
                     s.enable();
-                    s.disable();
-                    s.power_down();
                     s
                 }
 
@@ -263,6 +259,21 @@ macro_rules! adc_hal {
                     cfg
                 }
 
+                /// Get ADC samping time
+                pub fn get_sample_time(&self) -> AdcSampleTime {
+                    self.sample_time
+                }
+
+                /// Get ADC result alignment
+                pub fn get_align(&self) -> AdcAlign {
+                    self.align
+                }
+
+                /// Get ADC sampling resolution
+                pub fn get_resolution(&self) -> AdcSampleResolution {
+                    self.resolution
+                }
+
                 /// Set ADC sampling time
                 ///
                 /// Options can be found in [AdcSampleTime](crate::adc::AdcSampleTime).
@@ -270,7 +281,7 @@ macro_rules! adc_hal {
                     self.sample_time = t_samp;
                 }
 
-                /// Set the Adc result alignment
+                /// Set the ADC result alignment
                 ///
                 /// Options can be found in [AdcAlign](crate::adc::AdcAlign).
                 pub fn set_align(&mut self, align: AdcAlign) {
@@ -293,29 +304,37 @@ macro_rules! adc_hal {
                     }
                 }
 
-                fn power_up(&mut self) {
+                /// Disables Deeppowerdown-mode and enables voltage regulator
+                /// 
+                /// Note: After power-up, a [`calibration`]: #method.calibrate shall be run
+                pub fn power_up(&mut self, delay: &mut Delay) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().clear_bit()
                             .advregen().set_bit()
                     );
-                    self.delay.delay_us(10_u8);
+                    delay.delay_us(10_u8);
                 }
 
-                fn power_down(&mut self) {
+                /// Enables Deeppowerdown-mode and disables voltage regulator
+                /// 
+                /// Note: This resets the [`calibration`]: #method.calibrate of the ADC
+                pub fn power_down(&mut self) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().set_bit()
                             .advregen().clear_bit()
                     );
                 }
 
-                fn enable(&mut self) {
+                /// Turns ADC on
+                pub fn enable(&mut self) {
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                     self.rb.cr.modify(|_, w| w.aden().set_bit());
-                    while self.rb.isr.read().adrdy().bit_is_clear() {}
+                    while self.rb.ier.read().adrdyie().bit_is_clear() {}
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                 }
 
-                fn disable(&mut self) {
+                /// Turns ADC off
+                pub fn disable(&mut self) {
                     if self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
                         self.rb.cr.modify(|_, w|
                             w.adstp().set_bit()
@@ -334,21 +353,22 @@ macro_rules! adc_hal {
 
                 fn enable_clock(&mut self, ahb: &mut $AHB) {
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
+                    ahb.enr().modify(|_, w| w.$adcxen().clear_bit());
                 }
 
                 fn configure(&mut self) {
-                    // Single conversion mode, Software trigger (no hardware trigger), context queue enabled
+                    // Single conversion mode, Software trigger, context queue enabled
                     self.rb.cfgr.modify(|_, w| unsafe {
                         w.cont().clear_bit()
                             .exten().bits(0x0)
                             .jqdis().clear_bit()
                             .discen().set_bit()
-                            .res().bits(self.resolution.into())
                     });
                     self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0x0) });
                 }
 
-                fn calibrate(&mut self) {
+                /// Calibrates the ADC in single channel mode
+                pub fn calibrate(&mut self) {
                     // single channel (INNx equals to V_ref-)
                     self.rb.cr.modify(|_, w| 
                         w.adcaldif().clear_bit()
@@ -387,7 +407,10 @@ macro_rules! adc_hal {
                 fn convert(&mut self, chan: u8) -> u32 {
                     assert!(chan <= 19);
                     // Ensure that no conversions are ongoing
-                    assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());
+                    assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());  
+
+                    // Set resolution
+                    self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
 
                     // Select channel
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
@@ -411,12 +434,9 @@ macro_rules! adc_hal {
                     result
                 }
 
-                pub fn free(self) -> (&'a mut Delay, $ADC) {
-                    (self.delay, self.rb)
-                }
             }
 
-            impl<WORD, PIN> OneShot<$ADC, WORD, PIN> for Adc<'_, $ADC>
+            impl<WORD, PIN> OneShot<$ADC, WORD, PIN> for Adc<$ADC>
             where
                 WORD: From<u32>, 
                 PIN: Channel<$ADC, ID = u8>,
@@ -424,11 +444,7 @@ macro_rules! adc_hal {
                 type Error = ();
 
                 fn read(&mut self, _pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
-                    self.power_up();
-                    self.enable();
                     let res = self.convert(PIN::channel());
-                    self.disable();
-                    self.power_down();
                     Ok(res.into())
                 }
             }
