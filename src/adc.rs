@@ -21,9 +21,12 @@ pub struct Adc<ADC> {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(non_camel_case_types)]
+
 /// ADC sampling time
 ///
 /// Options for the sampling time, each is T + 0.5 ADC clock cycles.
+//
+// Refer to reference manual chapter 24.4.13
 pub enum AdcSampleTime {
     /// 1.5 cycles sampling time
     T_1,
@@ -49,6 +52,7 @@ impl AdcSampleTime {
     }
 }
 
+// Refer to reference manual chapter 24.4.13
 impl From<AdcSampleTime> for u8 {
     fn from(val: AdcSampleTime) -> u8 {
         match val {
@@ -66,9 +70,12 @@ impl From<AdcSampleTime> for u8 {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(non_camel_case_types)]
+
 /// ADC sampling resolution
 /// 
 /// Options for sampling resolution
+//
+// Refer to reference manual chapter 24.2
 pub enum AdcSampleResolution {
     /// 16 bit resulution
     B_16,
@@ -88,6 +95,7 @@ impl AdcSampleResolution {
     }
 }
 
+// Refer to reference manual chapter 24.4.27 (Table 205)
 impl From<AdcSampleResolution> for u8 {
     fn from(val: AdcSampleResolution) -> u8 {
         match val {
@@ -101,6 +109,8 @@ impl From<AdcSampleResolution> for u8 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+
+// Refer to 24.4.27 (Figure 162 - 165)
 pub enum AdcAlign {
     Right,
     Left,
@@ -137,6 +147,8 @@ macro_rules! adc_pins {
 
 // Not implementing Pxy_C adc pins
 // Just implmenting INPx pins (INNx defaulting to V_ref-)
+//
+// Refer to datasheet chapter 5 (Table 9)
 adc_pins!(ADC1,
     // No 0, 1
     PF11 => 2,
@@ -307,6 +319,8 @@ macro_rules! adc_hal {
                 /// Disables Deeppowerdown-mode and enables voltage regulator
                 /// 
                 /// Note: After power-up, a [`calibration`]: #method.calibrate shall be run
+                //
+                // Refer to reference manual chapter 24.4.6
                 pub fn power_up(&mut self, delay: &mut Delay) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().clear_bit()
@@ -318,6 +332,8 @@ macro_rules! adc_hal {
                 /// Enables Deeppowerdown-mode and disables voltage regulator
                 /// 
                 /// Note: This resets the [`calibration`]: #method.calibrate of the ADC
+                //
+                // Refer to reference manual chapter 24.4.6
                 pub fn power_down(&mut self) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().set_bit()
@@ -326,6 +342,8 @@ macro_rules! adc_hal {
                 }
 
                 /// Turns ADC on
+                //
+                // Refer to reference manual chapter 24.4.9
                 pub fn enable(&mut self) {
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                     self.rb.cr.modify(|_, w| w.aden().set_bit());
@@ -334,6 +352,8 @@ macro_rules! adc_hal {
                 }
 
                 /// Turns ADC off
+                //
+                // Refer to reference manual chapter 24.4.9
                 pub fn disable(&mut self) {
                     if self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
                         self.rb.cr.modify(|_, w|
@@ -358,16 +378,17 @@ macro_rules! adc_hal {
 
                 fn configure(&mut self) {
                     // Single conversion mode, Software trigger, context queue enabled
+                    // Refer to reference manual chapters 24.4.15, 24.4.19
                     self.rb.cfgr.modify(|_, w| unsafe {
                         w.cont().clear_bit()
                             .exten().bits(0x0)
-                            .jqdis().clear_bit()
                             .discen().set_bit()
                     });
-                    self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0x0) });
                 }
 
                 /// Calibrates the ADC in single channel mode
+                //
+                // Refer to reference manual chapter 24.4.8
                 pub fn calibrate(&mut self) {
                     // single channel (INNx equals to V_ref-)
                     self.rb.cr.modify(|_, w| 
@@ -380,6 +401,7 @@ macro_rules! adc_hal {
                 }
 
                 fn set_chan_smps(&mut self, chan: u8) {
+                    // Couldn't find smp0 register in reference manual
                     match chan {
                         1 => self.rb.smpr1.modify(|_, w| unsafe { w.smp1().bits(self.sample_time.into()) }),
                         2 => self.rb.smpr1.modify(|_, w| unsafe { w.smp2().bits(self.sample_time.into()) }),
@@ -404,6 +426,7 @@ macro_rules! adc_hal {
                     }
                 }
 
+                // Refer to reference manual chapter 24.4.16
                 fn convert(&mut self, chan: u8) -> u32 {
                     assert!(chan <= 19);
                     // Ensure that no conversions are ongoing
@@ -412,7 +435,7 @@ macro_rules! adc_hal {
                     // Set resolution
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
 
-                    // Select channel
+                    // Select channel (with preselection, refer to reference manual chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
                     self.set_chan_smps(chan);
                     self.rb.sqr1.modify(|_, w| unsafe { 
@@ -426,7 +449,7 @@ macro_rules! adc_hal {
                     // Wait until conversion finished
                     while self.rb.isr.read().eos().bit_is_clear() {}
 
-                    // Cleanup
+                    // Disable channel preselection, refer to reference manual chapter 24.4.12
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
 
                     // Retrieve result
