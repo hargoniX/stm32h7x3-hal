@@ -329,7 +329,7 @@ macro_rules! adc_hal {
                 pub fn enable(&mut self) {
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                     self.rb.cr.modify(|_, w| w.aden().set_bit());
-                    while self.rb.ier.read().adrdyie().bit_is_clear() {}
+                    while self.rb.isr.read().adrdy().bit_is_clear() {}
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                 }
 
@@ -360,11 +360,11 @@ macro_rules! adc_hal {
                     // Single conversion mode, Software trigger, context queue enabled
                     self.rb.cfgr.modify(|_, w| unsafe {
                         w.cont().clear_bit()
-                            .exten().bits(0x0)
+                            .exten().bits(0b00)
                             .jqdis().clear_bit()
                             .discen().set_bit()
                     });
-                    self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0x0) });
+                    self.rb.jsqr.modify(|_, w| unsafe { w.jexten().bits(0b00) });
                 }
 
                 /// Calibrates the ADC in single channel mode
@@ -424,7 +424,7 @@ macro_rules! adc_hal {
                     self.rb.cr.modify(|_, w| w.adstart().set_bit());
 
                     // Wait until conversion finished
-                    while self.rb.isr.read().eos().bit_is_clear() {}
+                    while self.rb.isr.read().eoc().bit_is_clear() {}
 
                     // Cleanup
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
