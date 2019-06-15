@@ -386,6 +386,10 @@ macro_rules! adc_hal {
                             .exten().bits(0b00)
                             .discen().set_bit()
                     });
+                    // Enables boost mode since clock frequency > 20MHz
+                    // 
+                    // Refer to RM0433 Rev 6 - Chapter 24.4.3
+                    self.rb.cr.modify(|_, w| w.boost().set_bit());
                 }
 
                 /// Calibrates the ADC in single channel mode
