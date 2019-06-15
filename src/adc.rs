@@ -8,7 +8,7 @@ use crate::gpio::gpioc::{PC0, PC1, PC2, PC3, PC4, PC5};
 use crate::gpio::gpiof::{PF3, PF4, PF5, PF6, PF7, PF8, PF9, PF10, PF11, PF12, PF13, PF14};
 use crate::gpio::gpioh::{PH2, PH3, PH4, PH5};
 use crate::delay::Delay;
-use crate::rcc::{AHB1, AHB4};
+use crate::rcc::{AHB1, AHB4, D3CCIPR};
 
 use hal::blocking::delay::DelayUs;
 
@@ -26,7 +26,7 @@ pub struct Adc<ADC> {
 ///
 /// Options for the sampling time, each is T + 0.5 ADC clock cycles.
 //
-// Refer to reference manual chapter 24.4.13
+// Refer to RM0433 Rev 6 - Chapter 24.4.13
 pub enum AdcSampleTime {
     /// 1.5 cycles sampling time
     T_1,
@@ -52,7 +52,7 @@ impl AdcSampleTime {
     }
 }
 
-// Refer to reference manual chapter 24.4.13
+// Refer to RM0433 Rev 6 - Chapter 24.4.13
 impl From<AdcSampleTime> for u8 {
     fn from(val: AdcSampleTime) -> u8 {
         match val {
@@ -75,7 +75,7 @@ impl From<AdcSampleTime> for u8 {
 /// 
 /// Options for sampling resolution
 //
-// Refer to reference manual chapter 24.2
+// Refer to RM0433 Rev 6 - Chapter 24.2
 pub enum AdcSampleResolution {
     /// 16 bit resulution
     B_16,
@@ -95,7 +95,7 @@ impl AdcSampleResolution {
     }
 }
 
-// Refer to reference manual chapter 24.4.27 (Table 205)
+// Refer to RM0433 Rev 6 - Chapter 24.4.27 (Table 205)
 impl From<AdcSampleResolution> for u8 {
     fn from(val: AdcSampleResolution) -> u8 {
         match val {
@@ -148,7 +148,7 @@ macro_rules! adc_pins {
 // Not implementing Pxy_C adc pins
 // Just implmenting INPx pins (INNx defaulting to V_ref-)
 //
-// Refer to datasheet chapter 5 (Table 9)
+// Refer to DS12110 Rev 7 - Chapter 5 (Table 9)
 adc_pins!(ADC1,
     // No 0, 1
     PF11 => 2,
@@ -232,14 +232,15 @@ macro_rules! adc_hal {
                 ///
                 /// Sets all configurable parameters to one-shot defaults,
                 /// performs a boot-time calibration.
-                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &mut Delay) -> Self {
+                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &mut Delay, d3ccipr: &mut D3CCIPR) -> Self
+                {
                     let mut s = Self {
                         rb: adc,
                         sample_time: AdcSampleTime::default(),
                         align: AdcAlign::default(),
                         resolution: AdcSampleResolution::default(),
                     };
-                    s.enable_clock(ahb);
+                    s.enable_clock(ahb, d3ccipr);
                     s.power_down();
                     s.reset(ahb);
                     s.configure();
@@ -320,7 +321,7 @@ macro_rules! adc_hal {
                 /// 
                 /// Note: After power-up, a [`calibration`]: #method.calibrate shall be run
                 //
-                // Refer to reference manual chapter 24.4.6
+                // Refer to RM0433 Rev 6 - Chapter 24.4.6
                 pub fn power_up(&mut self, delay: &mut Delay) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().clear_bit()
@@ -333,7 +334,7 @@ macro_rules! adc_hal {
                 /// 
                 /// Note: This resets the [`calibration`]: #method.calibrate of the ADC
                 //
-                // Refer to reference manual chapter 24.4.6
+                // Refer to RM0433 Rev 6 - Chapter 24.4.6
                 pub fn power_down(&mut self) {
                     self.rb.cr.modify(|_, w| 
                         w.deeppwd().set_bit()
@@ -343,7 +344,7 @@ macro_rules! adc_hal {
 
                 /// Turns ADC on
                 //
-                // Refer to reference manual chapter 24.4.9
+                // Refer to RM0433 Rev 6 - Chapter 24.4.9
                 pub fn enable(&mut self) {
                     self.rb.isr.modify(|_, w| w.adrdy().set_bit());
                     self.rb.cr.modify(|_, w| w.aden().set_bit());
@@ -353,7 +354,7 @@ macro_rules! adc_hal {
 
                 /// Turns ADC off
                 //
-                // Refer to reference manual chapter 24.4.9
+                // Refer to RM0433 Rev 6 - Chapter 24.4.9
                 pub fn disable(&mut self) {
                     if self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
                         self.rb.cr.modify(|_, w|
@@ -372,13 +373,14 @@ macro_rules! adc_hal {
                     ahb.rstr().modify(|_, w| w.$adcxrst().clear_bit());
                 }
 
-                fn enable_clock(&mut self, ahb: &mut $AHB) {
+                fn enable_clock(&mut self, ahb: &mut $AHB, d3ccipr: &mut D3CCIPR) {
+                    d3ccipr.constrain().modify(|_, w| unsafe {w.adcsrc().bits(0b10)});
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
                 }
 
                 fn configure(&mut self) {
-                    // Single conversion mode, Software trigger, context queue enabled
-                    // Refer to reference manual chapters 24.4.15, 24.4.19
+                    // Single conversion mode, Software trigger
+                    // Refer to RM0433 Rev 6 - Chapters 24.4.15, 24.4.19
                     self.rb.cfgr.modify(|_, w| unsafe {
                         w.cont().clear_bit()
                             .exten().bits(0b00)
@@ -388,7 +390,7 @@ macro_rules! adc_hal {
 
                 /// Calibrates the ADC in single channel mode
                 //
-                // Refer to reference manual chapter 24.4.8
+                // Refer to RM0433 Rev 6 - Chapter 24.4.8
                 pub fn calibrate(&mut self) {
                     // single channel (INNx equals to V_ref-)
                     self.rb.cr.modify(|_, w| 
@@ -401,8 +403,9 @@ macro_rules! adc_hal {
                 }
 
                 fn set_chan_smps(&mut self, chan: u8) {
-                    // Couldn't find smp0 register in reference manual
                     match chan {
+                        // Couldn't find smp0 in smpr1 register (well done stm) so I need to manually write to that register
+                        0 => self.rb.smpr1.modify(|r, w| unsafe { w.bits((r.bits() & !0b111) | self.sample_time as u32) }),
                         1 => self.rb.smpr1.modify(|_, w| unsafe { w.smp1().bits(self.sample_time.into()) }),
                         2 => self.rb.smpr1.modify(|_, w| unsafe { w.smp2().bits(self.sample_time.into()) }),
                         3 => self.rb.smpr1.modify(|_, w| unsafe { w.smp3().bits(self.sample_time.into()) }),
@@ -426,7 +429,7 @@ macro_rules! adc_hal {
                     }
                 }
 
-                // Refer to reference manual chapter 24.4.16
+                // Refer to RM0433 Rev 6 - Chapter 24.4.16
                 fn convert(&mut self, chan: u8) -> u32 {
                     assert!(chan <= 19);
                     // Ensure that no conversions are ongoing
@@ -435,7 +438,7 @@ macro_rules! adc_hal {
                     // Set resolution
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
 
-                    // Select channel (with preselection, refer to reference manual chapter 24.4.12)
+                    // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
                     self.set_chan_smps(chan);
                     self.rb.sqr1.modify(|_, w| unsafe { 
@@ -449,11 +452,11 @@ macro_rules! adc_hal {
                     // Wait until conversion finished
                     while self.rb.isr.read().eoc().bit_is_clear() {}
 
-                    // Disable channel preselection, refer to reference manual chapter 24.4.12
+                    // Disable channel preselection, refer to RM0433 Rev 6 - Chapter 24.4.12
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
 
                     // Retrieve result
-                    let result = self.rb.dr.read().bits();
+                    let result = self.rb.dr.read().rdata().bits() as u32;
                     result
                 }
 
@@ -495,4 +498,3 @@ adc_hal! {
         AHB4
     ),
 }
-
