@@ -372,7 +372,7 @@ macro_rules! adc_hal {
                     // single channel (INNx equals to V_ref-)
                     self.rb.cr.modify(|_, w| 
                         w.adcaldif().clear_bit()
-                            .adcallin().clear_bit()
+                            .adcallin().set_bit()
                     );
                     // calibrate
                     self.rb.cr.modify(|_, w| w.adcal().set_bit());
