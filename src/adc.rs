@@ -394,9 +394,13 @@ macro_rules! adc_hal {
                 }
 
                 /// Calibrates the ADC in single channel mode
+                /// 
+                /// Note: The ADC must be disabled 
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.8
                 pub fn calibrate(&mut self) {
+                    self.check_calibration_conditions();
+                    
                     // single channel (INNx equals to V_ref-)
                     self.rb.cr.modify(|_, w| 
                         w.adcaldif().clear_bit()
@@ -405,6 +409,18 @@ macro_rules! adc_hal {
                     // calibrate
                     self.rb.cr.modify(|_, w| w.adcal().set_bit());
                     while self.rb.cr.read().adcal().bit_is_set() {}
+                }
+
+                fn check_calibration_conditions(&self) {
+                    if self.rb.cr.read().aden().bit_is_set() {
+                        panic!("Cannot start calibration when the ADC is enabled");
+                    }
+                    if self.rb.cr.read().deeppwd().bit_is_set() {
+                        panic!("Cannot start calibration when the ADC is in deeppowerdown-mode");
+                    }
+                    if self.rb.cr.read().advregen().bit_is_clear() {
+                        panic!("Cannot start calibration when the ADC voltage regulator is disabled");
+                    }
                 }
 
                 fn set_chan_smps(&mut self, chan: u8) {
