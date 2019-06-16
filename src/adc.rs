@@ -74,6 +74,7 @@ impl From<AdcSampleTime> for u8 {
 /// ADC sampling resolution
 /// 
 /// Options for sampling resolution
+/// 8 Bit resolution isn't supported yet by software because the RES[2:0] bit in ADC_CFGR isn't correctly implemented yet
 //
 // Refer to RM0433 Rev 6 - Chapter 24.2
 pub enum AdcSampleResolution {
@@ -85,8 +86,8 @@ pub enum AdcSampleResolution {
     B_12,
     /// 10 bit resolution
     B_10,
-    /// 8 bit resolution
-    B_8,
+    // /// 8 bit resolution
+    // B_8,
 }
 
 impl AdcSampleResolution {
@@ -103,7 +104,7 @@ impl From<AdcSampleResolution> for u8 {
             AdcSampleResolution::B_14 => 0b001,
             AdcSampleResolution::B_12 => 0b010,
             AdcSampleResolution::B_10 => 0b011,
-            AdcSampleResolution::B_8 => 0b111,
+            // AdcSampleResolution::B_8 => 0b100,
         }
     }
 }
@@ -122,11 +123,11 @@ impl AdcAlign {
     }
 }
 
-impl From<AdcAlign> for bool {
+impl From<AdcAlign> for u8 {
     fn from(val: AdcAlign) -> Self {
         match val {
-            AdcAlign::Left => false,
-            AdcAlign::Right => true,
+            AdcAlign::Left => 0,
+            AdcAlign::Right => 1,
         }
     }
 }
@@ -460,7 +461,7 @@ macro_rules! adc_hal {
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
 
                     // Retrieve result
-                    let result = self.rb.dr.read().rdata().bits() as u32;
+                    let result = self.rb.dr.read().bits();
                     result
                 }
 
