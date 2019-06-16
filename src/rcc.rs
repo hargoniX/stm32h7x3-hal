@@ -23,6 +23,7 @@ impl RccExt for RCC {
             apb2: APB2 { _0: ()},
             apb3: APB3 { _0: ()},
             apb4: APB4 { _0: ()},
+            d3ccipr: D3CCIPR { _0: ()},
             cfgr: CFGR {
                 hclk1: None,
                 hclk2: None,
@@ -61,8 +62,20 @@ pub struct Rcc {
     pub apb3: APB3,
     /// Advanced Peripheral Bus 4 (APB1) registers
     pub apb4: APB4,
+    /// D3CCIPR
+    pub d3ccipr: D3CCIPR,
     /// Clock configuration
     pub cfgr: CFGR,
+}
+
+pub struct D3CCIPR {
+    _0: (),
+}
+
+impl D3CCIPR {
+    pub(crate) fn constrain(&mut self) -> &rcc::D3CCIPR {
+        unsafe {&(*RCC::ptr()).d3ccipr}
+    }
 }
 
 macro_rules! ahb {

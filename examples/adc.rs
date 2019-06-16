@@ -1,6 +1,8 @@
 #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
+#![feature(proc_macro_hygiene)]
+
 
 use panic_semihosting as _;
 
@@ -9,6 +11,7 @@ use stm32h7x3_hal::{
     stm32h7x3,
     delay::Delay,
     prelude::*,
+    calc_sys_ck_config,
 };
 use cortex_m_rt::entry;
 
@@ -30,20 +33,21 @@ fn main() -> ! {
     // clock is configurable. So its frequency may be tweaked to meet certain
     // practical needs. User specified value is be approximated using supported
     // prescaler values 2/4/6/8.
+    //let config = calc_sys_ck_config!(19_000_000);
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
     let mut delay = Delay::new(cp.SYST, clocks);
 
     // Setup ADC
-    let mut adc1 = adc::Adc::adc1(p.ADC1, &mut rcc.ahb1, &mut delay);
+    let mut adc1 = adc::Adc::adc1(p.ADC1, &mut rcc.ahb1, &mut delay, &mut rcc.d3ccipr);
 
     // Setup GPIOB
     let gpiob = p.GPIOB.split(&mut rcc.ahb4);
 
     // Configure pb0, pb1 as an analog input
-    let mut ch0 = gpiob.pb1.into_analog();
+    let mut ch5 = gpiob.pb1.into_analog();
 
     loop {
-        let data: u32 = adc1.read(&mut ch0).unwrap();
+        let data: u32 = adc1.read(&mut ch5).unwrap();
         hprintln!("adc1: {}", data).unwrap();
     }
 }
