@@ -318,14 +318,13 @@ macro_rules! adc_hal {
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.9
                 pub fn disable(&mut self) {
-                    if self.rb.cr.read().adstart().bit_is_set() || self.rb.cr.read().jadstart().bit_is_set() {
-                        self.rb.cr.modify(|_, w|
-                            w.adstp().set_bit()
-                                .jadstp().set_bit()
-                        );
-                        while self.rb.cr.read().adstp().bit_is_set() {}
-                        while self.rb.cr.read().jadstp().bit_is_set() {}
+                    if self.rb.cr.read().adstart().bit_is_set() {
+                        self.stop_regular_conversion();
                     }
+                    if self.rb.cr.read().jadstart().bit_is_set() {
+                        self.stop_injected_conversion();
+                    }
+
                     self.rb.cr.modify(|_, w| w.addis().set_bit());
                     while self.rb.cr.read().aden().bit_is_set() {}
                 }
@@ -336,7 +335,7 @@ macro_rules! adc_hal {
                 }
 
                 fn enable_clock(&mut self, ahb: &mut $AHB, d3ccipr: &mut D3CCIPR) {
-                    d3ccipr.constrain().modify(|_, w| unsafe {w.adcsrc().bits(0b10)});
+                    d3ccipr.constrain().modify(|_, w| unsafe { w.adcsrc().bits(0b10) });
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
                 }
 
@@ -370,6 +369,16 @@ macro_rules! adc_hal {
                     // calibrate
                     self.rb.cr.modify(|_, w| w.adcal().set_bit());
                     while self.rb.cr.read().adcal().bit_is_set() {}
+                }
+
+                fn stop_regular_conversion(&mut self) {
+                    self.rb.cr.modify(|_, w| w.adstp().set_bit());
+                    while self.rb.cr.read().adstp().bit_is_set() {}
+                }
+
+                fn stop_injected_conversion(&mut self) {
+                    self.rb.cr.modify(|_, w| w.jadstp().set_bit());
+                    while self.rb.cr.read().jadstp().bit_is_set() {}
                 }
 
                 fn check_calibration_conditions(&self) {
@@ -444,10 +453,16 @@ macro_rules! adc_hal {
                 fn check_conversion_conditions(&self) {
                     // Ensure that no conversions are ongoing
                     if self.rb.cr.read().adstart().bit_is_set() {
-                        panic!("Cannot start conversion because a regular conversion is ongoing")
+                        panic!("Cannot start conversion because a regular conversion is ongoing");
                     }
                     if self.rb.cr.read().jadstart().bit_is_set() {
-                        panic!("Cannot start conversion because an injected conversion is ongoing")
+                        panic!("Cannot start conversion because an injected conversion is ongoing");
+                    }
+                    if self.rb.cr.read().aden().bit_is_clear() {
+                        panic!("Cannot start conversion because ADC is currently disabled");
+                    }
+                    if self.rb.cr.read().addis().bit_is_set() {
+                        panic!("Cannot start conversion because there is a pending request to disable the ADC");
                     }
                 }
 
