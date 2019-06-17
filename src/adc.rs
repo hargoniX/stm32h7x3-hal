@@ -457,11 +457,7 @@ macro_rules! adc_hal {
                     assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());  
 
                     // Set resolution
-                    match self.resolution {
-                        // Current implementation of RES[2:0] doesn't support 8 bit resolution, so I need to write to that register manually
-                        AdcSampleResolution::B_8 => self.rb.cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0b111 << 2)) | ((self.resolution as u32) << 2)) }),
-                        _ => self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) }),
-                    }
+                    self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
