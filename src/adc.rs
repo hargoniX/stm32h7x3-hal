@@ -86,8 +86,8 @@ pub enum AdcSampleResolution {
     B_12,
     /// 10 bit resolution
     B_10,
-    // /// 8 bit resolution
-    // B_8,
+    /// 8 bit resolution
+    B_8,
 }
 
 impl AdcSampleResolution {
@@ -104,7 +104,8 @@ impl From<AdcSampleResolution> for u8 {
             AdcSampleResolution::B_14 => 0b001,
             AdcSampleResolution::B_12 => 0b010,
             AdcSampleResolution::B_10 => 0b011,
-            // AdcSampleResolution::B_8 => 0b100,
+            // For Revision model V
+            AdcSampleResolution::B_8 => 0b100,
         }
     }
 }
@@ -423,7 +424,7 @@ macro_rules! adc_hal {
                     }
                 }
 
-                fn set_chan_smps(&mut self, chan: u8) {
+                fn set_chan_smp(&mut self, chan: u8) {
                     match chan {
                         // Couldn't find smp0 in smpr1 register so I need to manually write to that register
                         0 => self.rb.smpr1.modify(|r, w| unsafe { w.bits((r.bits() & !0b111) | self.sample_time as u32) }),
@@ -457,11 +458,15 @@ macro_rules! adc_hal {
                     assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());  
 
                     // Set resolution
-                    self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
+                    match self.resolution {
+                        // Current implementation of RES[2:0] doesn't support 8 bit resolution, so I need to write to that register manually
+                        AdcSampleResolution::B_8 => self.rb.cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0b111 << 2)) | ((self.resolution as u32) << 2)) }),
+                        _ => self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) }),
+                    }
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
-                    self.set_chan_smps(chan);
+                    self.set_chan_smp(chan);
                     self.rb.sqr1.modify(|_, w| unsafe { 
                         w.sq1().bits(chan)
                             .l3().bits(0)
@@ -473,7 +478,7 @@ macro_rules! adc_hal {
                     // Wait until conversion finished
                     while self.rb.isr.read().eoc().bit_is_clear() {}
 
-                    // Disable channel preselection, refer to RM0433 Rev 6 - Chapter 24.4.12
+                    // Disable preselection of this channel, refer to RM0433 Rev 6 - Chapter 24.4.12
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() & !(1 << chan)) });
 
                     // Retrieve result
