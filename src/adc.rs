@@ -15,7 +15,6 @@ use hal::blocking::delay::DelayUs;
 pub struct Adc<ADC> {
     rb: ADC,
     sample_time: AdcSampleTime,
-    align: AdcAlign,
     resolution: AdcSampleResolution,
 }
 
@@ -103,31 +102,12 @@ impl From<AdcSampleResolution> for u8 {
             AdcSampleResolution::B_14 => 0b001,
             AdcSampleResolution::B_12 => 0b010,
             AdcSampleResolution::B_10 => 0b011,
-            // For Revision model V
+            // Revision model Y
+            #[cfg(not(feature = "rev_v"))]
             AdcSampleResolution::B_8 => 0b100,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-
-// Refer to 24.4.27 (Figure 162 - 165)
-pub enum AdcAlign {
-    Right,
-    Left,
-}
-
-impl AdcAlign {
-    pub fn default() -> Self {
-        AdcAlign::Right
-    }
-}
-
-impl From<AdcAlign> for u8 {
-    fn from(val: AdcAlign) -> Self {
-        match val {
-            AdcAlign::Left => 0,
-            AdcAlign::Right => 1,
+            // Revision model V
+            #[cfg(feature = "rev_v")]
+            AdcSampleResolution::B_8 => 0b111,
         }
     }
 }
@@ -238,7 +218,6 @@ macro_rules! adc_hal {
                     let mut s = Self {
                         rb: adc,
                         sample_time: AdcSampleTime::default(),
-                        align: AdcAlign::default(),
                         resolution: AdcSampleResolution::default(),
                     };
                     s.enable_clock(ahb, d3ccipr);
@@ -278,11 +257,6 @@ macro_rules! adc_hal {
                     self.sample_time
                 }
 
-                /// Get ADC result alignment
-                pub fn get_align(&self) -> AdcAlign {
-                    self.align
-                }
-
                 /// Get ADC sampling resolution
                 pub fn get_resolution(&self) -> AdcSampleResolution {
                     self.resolution
@@ -295,13 +269,6 @@ macro_rules! adc_hal {
                     self.sample_time = t_samp;
                 }
 
-                /// Set the ADC result alignment
-                ///
-                /// Options can be found in [AdcAlign](crate::adc::AdcAlign).
-                pub fn set_align(&mut self, align: AdcAlign) {
-                    self.align = align;
-                }
-
                 /// Set ADC sampling resolution
                 /// 
                 /// Options can be found in [AdcSampleResolution](crate::adc::AdcSampleResolution)
@@ -311,11 +278,7 @@ macro_rules! adc_hal {
 
                 /// Returns the largest possible sample value for the current settings
                 pub fn max_sample(&self) -> u32 {
-                    match self.align {
-                        // AdcAlign::Left => u16::max_value(),
-                        AdcAlign::Left => u32::max_value() << (32 - self.resolution as u32),
-                        AdcAlign::Right => (1 << self.resolution as u32) - 1,
-                    }
+                    (1 << self.resolution as u32) - 1
                 }
 
                 /// Disables Deeppowerdown-mode and enables voltage regulator
