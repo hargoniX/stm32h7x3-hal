@@ -20,7 +20,7 @@ steps:
     source $HOME/.cargo/env
     cargo build --all
   displayName: "Build the project"
-- script: |
-    source $HOME/.cargo/env
-    cargo test
-  displayName: "Run unittests"
+#- script: |
+#    source $HOME/.cargo/env
+#    cargo test
+#  displayName: "Run unittests"
