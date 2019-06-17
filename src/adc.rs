@@ -425,7 +425,7 @@ macro_rules! adc_hal {
 
                 fn set_chan_smps(&mut self, chan: u8) {
                     match chan {
-                        // Couldn't find smp0 in smpr1 register (well done stm) so I need to manually write to that register
+                        // Couldn't find smp0 in smpr1 register so I need to manually write to that register
                         0 => self.rb.smpr1.modify(|r, w| unsafe { w.bits((r.bits() & !0b111) | self.sample_time as u32) }),
                         1 => self.rb.smpr1.modify(|_, w| unsafe { w.smp1().bits(self.sample_time.into()) }),
                         2 => self.rb.smpr1.modify(|_, w| unsafe { w.smp2().bits(self.sample_time.into()) }),
