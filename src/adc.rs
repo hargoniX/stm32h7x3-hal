@@ -74,7 +74,6 @@ impl From<AdcSampleTime> for u8 {
 /// ADC sampling resolution
 /// 
 /// Options for sampling resolution
-/// 8 Bit resolution isn't supported yet by software because the RES[2:0] bit in ADC_CFGR isn't correctly implemented yet
 //
 // Refer to RM0433 Rev 6 - Chapter 24.2
 pub enum AdcSampleResolution {
