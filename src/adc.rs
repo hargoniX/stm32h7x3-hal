@@ -1,4 +1,6 @@
-use embedded_hal::adc::{Channel, OneShot};
+use hal::adc::{Channel, OneShot};
+use hal::blocking::delay::DelayUs;
+
 use stm32h7::stm32h7x3::{ADC1, ADC2, ADC3};
 
 use crate::gpio::{Analog, AF0};
@@ -9,8 +11,6 @@ use crate::gpio::gpiof::{PF3, PF4, PF5, PF6, PF7, PF8, PF9, PF10, PF11, PF12, PF
 use crate::gpio::gpioh::{PH2, PH3, PH4, PH5};
 use crate::delay::Delay;
 use crate::rcc::{AHB1, AHB4, D3CCIPR};
-
-use hal::blocking::delay::DelayUs;
 
 pub struct Adc<ADC> {
     rb: ADC,
