@@ -195,7 +195,7 @@ adc_pins!(ADC3,
 
 /// Stored ADC config can be restored using the `Adc::restore_cfg` method
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct StoredConfig(AdcSampleTime, AdcAlign, AdcSampleResolution);
+pub struct StoredConfig(AdcSampleTime, AdcSampleResolution);
 
 #[allow(unused_macros)]
 macro_rules! adc_hal {
@@ -233,21 +233,19 @@ macro_rules! adc_hal {
 
                 /// Save current ADC config
                 pub fn save_cfg(&mut self) -> StoredConfig {
-                    StoredConfig(self.sample_time, self.align, self.resolution)
+                    StoredConfig(self.sample_time, self.resolution)
                 }
 
                 /// Restore saved ADC config
                 pub fn restore_cfg(&mut self, cfg: StoredConfig) {
                     self.sample_time = cfg.0;
-                    self.align = cfg.1;
-                    self.resolution = cfg.2;
+                    self.resolution = cfg.1;
                 }
 
                 /// Reset the ADC config to default, return existing config
                 pub fn default_cfg(&mut self) -> StoredConfig {
                     let cfg = self.save_cfg();
                     self.sample_time = AdcSampleTime::default();
-                    self.align = AdcAlign::default();
                     self.resolution = AdcSampleResolution::default();
                     cfg
                 }
