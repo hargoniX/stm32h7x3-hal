@@ -414,8 +414,7 @@ macro_rules! adc_hal {
                 // Refer to RM0433 Rev 6 - Chapter 24.4.16
                 fn convert(&mut self, chan: u8) -> u32 {
                     assert!(chan <= 19);
-                    // Ensure that no conversions are ongoing
-                    assert!(self.rb.cr.read().adstart().bit_is_clear() && self.rb.cr.read().jadstart().bit_is_clear());  
+                    self.check_conversion_conditions();
 
                     // Set resolution
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
@@ -440,6 +439,16 @@ macro_rules! adc_hal {
                     // Retrieve result
                     let result = self.rb.dr.read().bits();
                     result
+                }
+
+                fn check_conversion_conditions(&self) {
+                    // Ensure that no conversions are ongoing
+                    if self.rb.cr.read().adstart().bit_is_set() {
+                        panic!("Cannot start conversion because a regular conversion is ongoing")
+                    }
+                    if self.rb.cr.read().jadstart().bit_is_set() {
+                        panic!("Cannot start conversion because an injected conversion is ongoing")
+                    }
                 }
 
             }
