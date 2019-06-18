@@ -348,7 +348,7 @@ macro_rules! adc_hal {
                 }
 
                 /// Returns the offset calibration value for single ended channel
-                pub fn read_offset_calibration(&self) -> u16 {
+                pub fn read_offset_calibration_value(&self) -> u16 {
                     self.rb.calfact.read().calfact_s().bits()
                 }
 
@@ -356,7 +356,9 @@ macro_rules! adc_hal {
                 /// LINCALRDYW1 -> result[0]
                 /// ...
                 /// LINCALRDYW6 -> result[5]
-                pub fn read_linear_calibration_value(&mut self) -> [u32; 6] {
+                //
+                // Refer to RM0433 Rev 6 - Chapter 24.4.8 (Page 920)
+                pub fn read_linear_calibration_values(&mut self) -> [u32; 6] {
                     self.check_linear_read_conditions();
 
                     // Read 1th block of linear correction
