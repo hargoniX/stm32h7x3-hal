@@ -8,7 +8,7 @@ This crate provides an embedded-hal implementation for the stm32h7x3 chip series
 - [ ] SPI
 - [x] UART
 - [ ] PWM
-- [ ] ADC
+- [x] ADC
 - [ ] SDMMC
 ## WARNING
 This crate is as of now barely tested and thus it might not work as expected when using it.
