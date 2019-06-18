@@ -329,6 +329,81 @@ macro_rules! adc_hal {
                     while self.rb.cr.read().aden().bit_is_set() {}
                 }
 
+                /// Calibrates the ADC in single channel mode
+                /// 
+                /// Note: The ADC must be disabled 
+                //
+                // Refer to RM0433 Rev 6 - Chapter 24.4.8
+                pub fn calibrate(&mut self) {
+                    self.check_calibration_conditions();
+                    
+                    // single channel (INNx equals to V_ref-)
+                    self.rb.cr.modify(|_, w| 
+                        w.adcaldif().clear_bit()
+                            .adcallin().set_bit()
+                    );
+                    // calibrate
+                    self.rb.cr.modify(|_, w| w.adcal().set_bit());
+                    while self.rb.cr.read().adcal().bit_is_set() {}
+                }
+
+                /// Returns the offset calibration value for single ended channel
+                pub fn read_offset_calibration(&self) -> u16 {
+                    self.rb.calfact.read().calfact_s().bits()
+                }
+
+                /// Returns the linear calibration values stored in an array in the following order: 
+                /// LINCALRDYW1 -> result[0]
+                /// ...
+                /// LINCALRDYW6 -> result[5]
+                pub fn read_linear_calibration_value(&self) -> [u32; 6] {
+                    self.check_linear_read_conditions();
+
+                    // Read 1th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw1().clear_bit());
+                    while self.rb.cr.read().lincalrdyw1().bit_is_set() {}
+                    let res_1 = self.rb.calfact2.read().lincalfact().bits();
+
+                    // Read 2th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw2().clear_bit());
+                    while self.rb.cr.read().lincalrdyw2().bit_is_set() {}
+                    let res_2 = self.rb.calfact2.read().lincalfact().bits();
+
+                    // Read 3th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw3().clear_bit());
+                    while self.rb.cr.read().lincalrdyw3().bit_is_set() {}
+                    let res_3 = self.rb.calfact2.read().lincalfact().bits();
+
+                    // Read 4th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw4().clear_bit());
+                    while self.rb.cr.read().lincalrdyw4().bit_is_set() {}
+                    let res_4 = self.rb.calfact2.read().lincalfact().bits();
+
+                    // Read 5th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw5().clear_bit());
+                    while self.rb.cr.read().lincalrdyw5().bit_is_set() {}
+                    let res_5 = self.rb.calfact2.read().lincalfact().bits();
+
+                    // Read 6th block of linear correction
+                    self.rb.cr.modify(|_, w| w.lincalrdyw6().clear_bit());
+                    while self.rb.cr.read().lincalrdyw6().bit_is_set() {}
+                    let res_6 = self.rb.calfact2.read().lincalfact().bits();
+
+                    [res_1, res_2, res_3, res_4, res_5, res_6]
+                }
+
+                fn check_linear_read_conditions(&self) {
+                    if self.rb.cr.read().deeppwd().bit_is_set() {
+                        panic!("Cannot read linear calibration value when the ADC is in deeppowerdown-mode");
+                    }
+                    if self.rb.cr.read().advregen().bit_is_clear() {
+                        panic!("Cannot read linear calibration value when the voltage regulator is disabled");
+                    }
+                    if self.rb.cr.read().aden().bit_is_clear() {
+                        panic!("Cannot read linear calibration value when the ADC is disabled");
+                    }
+                }
+
                 fn reset(&mut self, ahb: &mut $AHB) {
                     ahb.rstr().modify(|_, w| w.$adcxrst().set_bit());
                     ahb.rstr().modify(|_, w| w.$adcxrst().clear_bit());
@@ -351,24 +426,6 @@ macro_rules! adc_hal {
                     // 
                     // Refer to RM0433 Rev 6 - Chapter 24.4.3
                     self.rb.cr.modify(|_, w| w.boost().set_bit());
-                }
-
-                /// Calibrates the ADC in single channel mode
-                /// 
-                /// Note: The ADC must be disabled 
-                //
-                // Refer to RM0433 Rev 6 - Chapter 24.4.8
-                pub fn calibrate(&mut self) {
-                    self.check_calibration_conditions();
-                    
-                    // single channel (INNx equals to V_ref-)
-                    self.rb.cr.modify(|_, w| 
-                        w.adcaldif().clear_bit()
-                            .adcallin().set_bit()
-                    );
-                    // calibrate
-                    self.rb.cr.modify(|_, w| w.adcal().set_bit());
-                    while self.rb.cr.read().adcal().bit_is_set() {}
                 }
 
                 fn stop_regular_conversion(&mut self) {
@@ -483,7 +540,7 @@ macro_rules! adc_hal {
     }
 }
 
-adc_hal! {
+adc_hal!(
     ADC1: (
         adc1,
         adc12en,
@@ -502,4 +559,4 @@ adc_hal! {
         adc3rst,
         AHB4
     ),
-}
+);
