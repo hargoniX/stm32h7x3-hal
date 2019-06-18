@@ -356,7 +356,7 @@ macro_rules! adc_hal {
                 /// LINCALRDYW1 -> result[0]
                 /// ...
                 /// LINCALRDYW6 -> result[5]
-                pub fn read_linear_calibration_value(&self) -> [u32; 6] {
+                pub fn read_linear_calibration_value(&mut self) -> [u32; 6] {
                     self.check_linear_read_conditions();
 
                     // Read 1th block of linear correction
