@@ -16,6 +16,7 @@ pub struct Adc<ADC> {
     rb: ADC,
     sample_time: AdcSampleTime,
     resolution: AdcSampleResolution,
+    lshift: AdcLshift,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -112,6 +113,25 @@ impl From<AdcSampleResolution> for u8 {
     }
 }
 
+pub struct AdcLshift(u8);
+
+impl AdcLshift {
+    pub new(lshift: u8) -> Self {
+        if lshift > 15 {
+            panic!("LSHIFT[3:0] must be in range of 0..=15");
+        }
+        AdcLshift(lshift)
+    }
+
+    pub default() -> Self {
+        AdcLshift(0)
+    }
+
+    pub get(&self) -> u8 {
+        self.0
+    }
+}
+
 macro_rules! adc_pins {
     ($ADC:ident, $($pin:ident => $chan:expr),+ $(,)*) => {
         $(
@@ -195,7 +215,7 @@ adc_pins!(ADC3,
 
 /// Stored ADC config can be restored using the `Adc::restore_cfg` method
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct StoredConfig(AdcSampleTime, AdcSampleResolution);
+pub struct StoredConfig(AdcSampleTime, AdcSampleResolution, AdcLshift);
 
 #[allow(unused_macros)]
 macro_rules! adc_hal {
@@ -213,12 +233,12 @@ macro_rules! adc_hal {
                 ///
                 /// Sets all configurable parameters to one-shot defaults,
                 /// performs a boot-time calibration.
-                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &mut Delay, d3ccipr: &mut D3CCIPR) -> Self
-                {
+                pub fn $init(adc: $ADC, ahb: &mut $AHB, delay: &mut Delay, d3ccipr: &mut D3CCIPR) -> Self {
                     let mut s = Self {
                         rb: adc,
                         sample_time: AdcSampleTime::default(),
                         resolution: AdcSampleResolution::default(),
+                        lshift: AdcLshift::default(),
                     };
                     s.enable_clock(ahb, d3ccipr);
                     s.power_down();
@@ -233,20 +253,22 @@ macro_rules! adc_hal {
 
                 /// Save current ADC config
                 pub fn save_cfg(&mut self) -> StoredConfig {
-                    StoredConfig(self.sample_time, self.resolution)
+                    StoredConfig(self.get_sample_time(), self.get_resolution(), self.get_lshift())
                 }
 
                 /// Restore saved ADC config
                 pub fn restore_cfg(&mut self, cfg: StoredConfig) {
-                    self.sample_time = cfg.0;
-                    self.resolution = cfg.1;
+                    self.set_sample_time(cfg.0);
+                    self.set_resolution(cfg.1);
+                    self.set_lshift(cfg.2);
                 }
 
                 /// Reset the ADC config to default, return existing config
                 pub fn default_cfg(&mut self) -> StoredConfig {
                     let cfg = self.save_cfg();
-                    self.sample_time = AdcSampleTime::default();
-                    self.resolution = AdcSampleResolution::default();
+                    self.set_sample_time(AdcSampleTime::default());
+                    self.set_resolution(AdcSampleResolution::default());
+                    self.set_lshift(AdcLshift::default());
                     cfg
                 }
 
@@ -258,6 +280,11 @@ macro_rules! adc_hal {
                 /// Get ADC sampling resolution
                 pub fn get_resolution(&self) -> AdcSampleResolution {
                     self.resolution
+                }
+
+                /// Get ADC lshift value
+                pub fn get_lshift(&self) -> AdcLshift {
+                    self.lshift
                 }
 
                 /// Set ADC sampling time
@@ -273,6 +300,13 @@ macro_rules! adc_hal {
                 pub fn set_resolution(&mut self, res: AdcSampleResolution) {
                     self.resolution = res;
                 }
+
+                /// Set ADC lshift
+                /// 
+                /// LSHIFT[3:0] must be in range of 0..=15
+                pub fn set_lshift(&mut self, lshift: AdcLshift) {
+                    self.lshift = lshift;
+                } 
 
                 /// Returns the largest possible sample value for the current settings
                 pub fn max_sample(&self) -> u32 {
@@ -347,6 +381,18 @@ macro_rules! adc_hal {
                     while self.rb.cr.read().adcal().bit_is_set() {}
                 }
 
+                fn check_calibration_conditions(&self) {
+                    if self.rb.cr.read().aden().bit_is_set() {
+                        panic!("Cannot start calibration when the ADC is enabled");
+                    }
+                    if self.rb.cr.read().deeppwd().bit_is_set() {
+                        panic!("Cannot start calibration when the ADC is in deeppowerdown-mode");
+                    }
+                    if self.rb.cr.read().advregen().bit_is_clear() {
+                        panic!("Cannot start calibration when the ADC voltage regulator is disabled");
+                    }
+                }
+
                 /// Returns the offset calibration value for single ended channel
                 pub fn read_offset_calibration_value(&self) -> u16 {
                     self.rb.calfact.read().calfact_s().bits()
@@ -361,17 +407,17 @@ macro_rules! adc_hal {
                 pub fn read_linear_calibration_values(&mut self) -> [u32; 6] {
                     self.check_linear_read_conditions();
 
-                    // Read 1th block of linear correction
+                    // Read 1st block of linear correction
                     self.rb.cr.modify(|_, w| w.lincalrdyw1().clear_bit());
                     while self.rb.cr.read().lincalrdyw1().bit_is_set() {}
                     let res_1 = self.rb.calfact2.read().lincalfact().bits();
 
-                    // Read 2th block of linear correction
+                    // Read 2nd block of linear correction
                     self.rb.cr.modify(|_, w| w.lincalrdyw2().clear_bit());
                     while self.rb.cr.read().lincalrdyw2().bit_is_set() {}
                     let res_2 = self.rb.calfact2.read().lincalfact().bits();
 
-                    // Read 3th block of linear correction
+                    // Read 3rd block of linear correction
                     self.rb.cr.modify(|_, w| w.lincalrdyw3().clear_bit());
                     while self.rb.cr.read().lincalrdyw3().bit_is_set() {}
                     let res_3 = self.rb.calfact2.read().lincalfact().bits();
@@ -395,6 +441,7 @@ macro_rules! adc_hal {
                 }
 
                 fn check_linear_read_conditions(&self) {
+                    // Ensure the ADC is enabled and is not in deeppowerdown-mode
                     if self.rb.cr.read().deeppwd().bit_is_set() {
                         panic!("Cannot read linear calibration value when the ADC is in deeppowerdown-mode");
                     }
@@ -440,40 +487,28 @@ macro_rules! adc_hal {
                     while self.rb.cr.read().jadstp().bit_is_set() {}
                 }
 
-                fn check_calibration_conditions(&self) {
-                    if self.rb.cr.read().aden().bit_is_set() {
-                        panic!("Cannot start calibration when the ADC is enabled");
-                    }
-                    if self.rb.cr.read().deeppwd().bit_is_set() {
-                        panic!("Cannot start calibration when the ADC is in deeppowerdown-mode");
-                    }
-                    if self.rb.cr.read().advregen().bit_is_clear() {
-                        panic!("Cannot start calibration when the ADC voltage regulator is disabled");
-                    }
-                }
-
                 fn set_chan_smp(&mut self, chan: u8) {
                     match chan {
-                        0 => self.rb.smpr1.modify(|_, w| w.smp0().bits(self.sample_time.into())),
-                        1 => self.rb.smpr1.modify(|_, w| w.smp1().bits(self.sample_time.into())),
-                        2 => self.rb.smpr1.modify(|_, w| w.smp2().bits(self.sample_time.into())),
-                        3 => self.rb.smpr1.modify(|_, w| w.smp3().bits(self.sample_time.into())),
-                        4 => self.rb.smpr1.modify(|_, w| w.smp4().bits(self.sample_time.into())),
-                        5 => self.rb.smpr1.modify(|_, w| w.smp5().bits(self.sample_time.into())),
-                        6 => self.rb.smpr1.modify(|_, w| w.smp6().bits(self.sample_time.into())),
-                        7 => self.rb.smpr1.modify(|_, w| w.smp7().bits(self.sample_time.into())),
-                        8 => self.rb.smpr1.modify(|_, w| w.smp8().bits(self.sample_time.into())),
-                        9 => self.rb.smpr1.modify(|_, w| w.smp9().bits(self.sample_time.into())),
-                        10 => self.rb.smpr2.modify(|_, w| w.smp10().bits(self.sample_time.into())),
-                        11 => self.rb.smpr2.modify(|_, w| w.smp11().bits(self.sample_time.into())),
-                        12 => self.rb.smpr2.modify(|_, w| w.smp12().bits(self.sample_time.into())),
-                        13 => self.rb.smpr2.modify(|_, w| w.smp13().bits(self.sample_time.into())),
-                        14 => self.rb.smpr2.modify(|_, w| w.smp14().bits(self.sample_time.into())),
-                        15 => self.rb.smpr2.modify(|_, w| w.smp15().bits(self.sample_time.into())),
-                        16 => self.rb.smpr2.modify(|_, w| w.smp16().bits(self.sample_time.into())),
-                        17 => self.rb.smpr2.modify(|_, w| w.smp17().bits(self.sample_time.into())),
-                        18 => self.rb.smpr2.modify(|_, w| w.smp18().bits(self.sample_time.into())),
-                        19 => self.rb.smpr2.modify(|_, w| w.smp19().bits(self.sample_time.into())),
+                        0 => self.rb.smpr1.modify(|_, w| w.smp0().bits(self.get_sample_time().into())),
+                        1 => self.rb.smpr1.modify(|_, w| w.smp1().bits(self.get_sample_time().into())),
+                        2 => self.rb.smpr1.modify(|_, w| w.smp2().bits(self.get_sample_time().into())),
+                        3 => self.rb.smpr1.modify(|_, w| w.smp3().bits(self.get_sample_time().into())),
+                        4 => self.rb.smpr1.modify(|_, w| w.smp4().bits(self.get_sample_time().into())),
+                        5 => self.rb.smpr1.modify(|_, w| w.smp5().bits(self.get_sample_time().into())),
+                        6 => self.rb.smpr1.modify(|_, w| w.smp6().bits(self.get_sample_time().into())),
+                        7 => self.rb.smpr1.modify(|_, w| w.smp7().bits(self.get_sample_time().into())),
+                        8 => self.rb.smpr1.modify(|_, w| w.smp8().bits(self.get_sample_time().into())),
+                        9 => self.rb.smpr1.modify(|_, w| w.smp9().bits(self.get_sample_time().into())),
+                        10 => self.rb.smpr2.modify(|_, w| w.smp10().bits(self.get_sample_time().into())),
+                        11 => self.rb.smpr2.modify(|_, w| w.smp11().bits(self.get_sample_time().into())),
+                        12 => self.rb.smpr2.modify(|_, w| w.smp12().bits(self.get_sample_time().into())),
+                        13 => self.rb.smpr2.modify(|_, w| w.smp13().bits(self.get_sample_time().into())),
+                        14 => self.rb.smpr2.modify(|_, w| w.smp14().bits(self.get_sample_time().into())),
+                        15 => self.rb.smpr2.modify(|_, w| w.smp15().bits(self.get_sample_time().into())),
+                        16 => self.rb.smpr2.modify(|_, w| w.smp16().bits(self.get_sample_time().into())),
+                        17 => self.rb.smpr2.modify(|_, w| w.smp17().bits(self.get_sample_time().into())),
+                        18 => self.rb.smpr2.modify(|_, w| w.smp18().bits(self.get_sample_time().into())),
+                        19 => self.rb.smpr2.modify(|_, w| w.smp19().bits(self.get_sample_time().into())),
                         _ => unreachable!(),
                     }
                 }
@@ -484,7 +519,10 @@ macro_rules! adc_hal {
                     self.check_conversion_conditions();
 
                     // Set resolution
-                    self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.resolution.into()) });
+                    self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.get_resolution().into()) });
+
+                    // Set LSHIFT[3:0]
+                    self.rb.cfgr2.modify(|_, w| unsafe { w.lshift().bits(self.get_lshift().get()) });
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
@@ -516,6 +554,7 @@ macro_rules! adc_hal {
                     if self.rb.cr.read().jadstart().bit_is_set() {
                         panic!("Cannot start conversion because an injected conversion is ongoing");
                     }
+                    // Ensure that the ADC is enabled
                     if self.rb.cr.read().aden().bit_is_clear() {
                         panic!("Cannot start conversion because ADC is currently disabled");
                     }
