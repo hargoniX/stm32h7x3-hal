@@ -20,7 +20,8 @@ version = "0.2"
 features = ["unproven"]
 
 [dependencies.stm32h7]
-version = "0.6"
+version = "0.7.0"
+path = "../stm32-rs/stm32h7"
 features = ["stm32h7x3", "rt"]
 
 [dependencies.void]

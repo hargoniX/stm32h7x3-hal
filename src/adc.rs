@@ -335,18 +335,18 @@ macro_rules! adc_hal {
                 }
 
                 fn enable_clock(&mut self, ahb: &mut $AHB, d3ccipr: &mut D3CCIPR) {
-                    d3ccipr.constrain().modify(|_, w| unsafe { w.adcsrc().bits(0b10) });
+                    d3ccipr.constrain().modify(|_, w| unsafe { w.adcsel().bits(0b10) });
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
                 }
 
                 fn configure(&mut self) {
                     // Single conversion mode, Software trigger
                     // Refer to RM0433 Rev 6 - Chapters 24.4.15, 24.4.19
-                    self.rb.cfgr.modify(|_, w| unsafe {
+                    self.rb.cfgr.modify(|_, w|
                         w.cont().clear_bit()
                             .exten().bits(0b00)
                             .discen().set_bit()
-                    });
+                    );
                     // Enables boost mode since clock frequency > 20MHz
                     // 
                     // Refer to RM0433 Rev 6 - Chapter 24.4.3
@@ -395,27 +395,26 @@ macro_rules! adc_hal {
 
                 fn set_chan_smp(&mut self, chan: u8) {
                     match chan {
-                        // Couldn't find smp0 in smpr1 register so I need to manually write to that register
-                        0 => self.rb.smpr1.modify(|r, w| unsafe { w.bits((r.bits() & !0b111) | self.sample_time as u32) }),
-                        1 => self.rb.smpr1.modify(|_, w| unsafe { w.smp1().bits(self.sample_time.into()) }),
-                        2 => self.rb.smpr1.modify(|_, w| unsafe { w.smp2().bits(self.sample_time.into()) }),
-                        3 => self.rb.smpr1.modify(|_, w| unsafe { w.smp3().bits(self.sample_time.into()) }),
-                        4 => self.rb.smpr1.modify(|_, w| unsafe { w.smp4().bits(self.sample_time.into()) }),
-                        5 => self.rb.smpr1.modify(|_, w| unsafe { w.smp5().bits(self.sample_time.into()) }),
-                        6 => self.rb.smpr1.modify(|_, w| unsafe { w.smp6().bits(self.sample_time.into()) }),
-                        7 => self.rb.smpr1.modify(|_, w| unsafe { w.smp7().bits(self.sample_time.into()) }),
-                        8 => self.rb.smpr1.modify(|_, w| unsafe { w.smp8().bits(self.sample_time.into()) }),
-                        9 => self.rb.smpr1.modify(|_, w| unsafe { w.smp9().bits(self.sample_time.into()) }),
-                        10 => self.rb.smpr2.modify(|_, w| unsafe { w.smp10().bits(self.sample_time.into()) }),
-                        11 => self.rb.smpr2.modify(|_, w| unsafe { w.smp11().bits(self.sample_time.into()) }),
-                        12 => self.rb.smpr2.modify(|_, w| unsafe { w.smp12().bits(self.sample_time.into()) }),
-                        13 => self.rb.smpr2.modify(|_, w| unsafe { w.smp13().bits(self.sample_time.into()) }),
-                        14 => self.rb.smpr2.modify(|_, w| unsafe { w.smp14().bits(self.sample_time.into()) }),
-                        15 => self.rb.smpr2.modify(|_, w| unsafe { w.smp15().bits(self.sample_time.into()) }),
-                        16 => self.rb.smpr2.modify(|_, w| unsafe { w.smp16().bits(self.sample_time.into()) }),
-                        17 => self.rb.smpr2.modify(|_, w| unsafe { w.smp17().bits(self.sample_time.into()) }),
-                        18 => self.rb.smpr2.modify(|_, w| unsafe { w.smp18().bits(self.sample_time.into()) }),
-                        19 => self.rb.smpr2.modify(|_, w| unsafe { w.smp19().bits(self.sample_time.into()) }),
+                        0 => self.rb.smpr1.modify(|_, w| w.smp0().bits(self.sample_time.into())),
+                        1 => self.rb.smpr1.modify(|_, w| w.smp1().bits(self.sample_time.into())),
+                        2 => self.rb.smpr1.modify(|_, w| w.smp2().bits(self.sample_time.into())),
+                        3 => self.rb.smpr1.modify(|_, w| w.smp3().bits(self.sample_time.into())),
+                        4 => self.rb.smpr1.modify(|_, w| w.smp4().bits(self.sample_time.into())),
+                        5 => self.rb.smpr1.modify(|_, w| w.smp5().bits(self.sample_time.into())),
+                        6 => self.rb.smpr1.modify(|_, w| w.smp6().bits(self.sample_time.into())),
+                        7 => self.rb.smpr1.modify(|_, w| w.smp7().bits(self.sample_time.into())),
+                        8 => self.rb.smpr1.modify(|_, w| w.smp8().bits(self.sample_time.into())),
+                        9 => self.rb.smpr1.modify(|_, w| w.smp9().bits(self.sample_time.into())),
+                        10 => self.rb.smpr2.modify(|_, w| w.smp10().bits(self.sample_time.into())),
+                        11 => self.rb.smpr2.modify(|_, w| w.smp11().bits(self.sample_time.into())),
+                        12 => self.rb.smpr2.modify(|_, w| w.smp12().bits(self.sample_time.into())),
+                        13 => self.rb.smpr2.modify(|_, w| w.smp13().bits(self.sample_time.into())),
+                        14 => self.rb.smpr2.modify(|_, w| w.smp14().bits(self.sample_time.into())),
+                        15 => self.rb.smpr2.modify(|_, w| w.smp15().bits(self.sample_time.into())),
+                        16 => self.rb.smpr2.modify(|_, w| w.smp16().bits(self.sample_time.into())),
+                        17 => self.rb.smpr2.modify(|_, w| w.smp17().bits(self.sample_time.into())),
+                        18 => self.rb.smpr2.modify(|_, w| w.smp18().bits(self.sample_time.into())),
+                        19 => self.rb.smpr2.modify(|_, w| w.smp19().bits(self.sample_time.into())),
                         _ => unreachable!(),
                     }
                 }
@@ -433,7 +432,7 @@ macro_rules! adc_hal {
                     self.set_chan_smp(chan);
                     self.rb.sqr1.modify(|_, w| unsafe { 
                         w.sq1().bits(chan)
-                            .l3().bits(0)
+                            .l().bits(0)
                     });
 
                     // Perform conversion
