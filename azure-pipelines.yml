@@ -17,6 +17,19 @@ steps:
     rustup target add thumbv7em-none-eabihf
   displayName: 'Install rust nightly'
 - script: |
+    cd ..
+    git clone https://github.com/stm32-rs/stm32-rs.git
+    cd stm32-rs
+    cargo install svd2rust
+    cargo install form
+    rustup component add rustfmt
+    pip install --user pyyaml
+    cd svd; ./extract.sh
+    cd ..; make patch
+    make svd2rust
+    make form
+  displayName: 'Install stm32-rs'
+- script: |
     source $HOME/.cargo/env
     cargo build --all
   displayName: "Build the project"
