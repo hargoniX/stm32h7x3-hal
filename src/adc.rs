@@ -121,10 +121,11 @@ impl From<AdcSampleResolution> for u8 {
 pub struct AdcLshift(u8);
 
 impl AdcLshift {
-    pub fn new(lshift: u8) -> Self {
+    pub fn value(lshift: u8) -> Self {
         if lshift > 15 {
             panic!("LSHIFT[3:0] must be in range of 0..=15");
         }
+
         AdcLshift(lshift)
     }
 
@@ -605,7 +606,6 @@ macro_rules! adc_hal {
                         panic!("Cannot start conversion because there is a pending request to disable the ADC");
                     }
                 }
-
             }
 
             impl<WORD, PIN> OneShot<$ADC, WORD, PIN> for Adc<$ADC>
