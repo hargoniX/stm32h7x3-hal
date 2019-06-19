@@ -254,11 +254,12 @@ macro_rules! adc_hal {
                     s.enable_clock(ahb, d3ccipr);
                     s.power_down();
                     s.reset(ahb);
-                    s.configure();
                     s.power_up(delay);
                     s.disable();
+                    s.preconfigure();
                     s.calibrate();
                     s.enable();
+                    s.configure();
                     s
                 }
 
@@ -474,19 +475,7 @@ macro_rules! adc_hal {
                     ahb.enr().modify(|_, w| w.$adcxen().set_bit());
                 }
 
-                fn configure(&mut self) {
-                    // Single conversion mode, Software trigger
-                    // Refer to RM0433 Rev 6 - Chapters 24.4.15, 24.4.19
-                    self.rb.cfgr.modify(|_, w|
-                        w.cont().clear_bit()
-                            .exten().bits(0b00)
-                            .discen().set_bit()
-                    );
-                    // Enables boost mode since clock frequency > 20MHz
-                    //
-                    // Refer to RM0433 Rev 6 - Chapter 24.4.3
-                    self.rb.cr.modify(|_, w| w.boost().set_bit());
-
+                fn preconfigure(&mut self) {
                     self.configure_channels_dif_mode();
                 }
 
@@ -514,6 +503,21 @@ macro_rules! adc_hal {
                             .difsel18().clear_bit()
                             .difsel19().clear_bit()
                     );
+                }
+
+                fn configure(&mut self) {
+                    // Single conversion mode, Software trigger
+                    // Refer to RM0433 Rev 6 - Chapters 24.4.15, 24.4.19
+                    self.rb.cfgr.modify(|_, w|
+                        w.cont().clear_bit()
+                            .exten().bits(0b00)
+                            .discen().set_bit()
+                    );
+
+                    // Enables boost mode since clock frequency > 20MHz
+                    //
+                    // Refer to RM0433 Rev 6 - Chapter 24.4.3
+                    self.rb.cr.modify(|_, w| w.boost().set_bit());
                 }
 
                 fn stop_regular_conversion(&mut self) {
