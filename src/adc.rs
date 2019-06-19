@@ -72,7 +72,7 @@ impl From<AdcSampleTime> for u8 {
 #[allow(non_camel_case_types)]
 
 /// ADC sampling resolution
-/// 
+///
 /// Options for sampling resolution
 //
 // Refer to RM0433 Rev 6 - Chapter 24.2
@@ -113,21 +113,26 @@ impl From<AdcSampleResolution> for u8 {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+
+/// ADC LSHIFT[3:0] of the converted value
+///
+/// Only values in range of 0..=15 are allowed.
 pub struct AdcLshift(u8);
 
 impl AdcLshift {
-    pub new(lshift: u8) -> Self {
+    pub fn new(lshift: u8) -> Self {
         if lshift > 15 {
             panic!("LSHIFT[3:0] must be in range of 0..=15");
         }
         AdcLshift(lshift)
     }
 
-    pub default() -> Self {
+    pub fn default() -> Self {
         AdcLshift(0)
     }
 
-    pub get(&self) -> u8 {
+    pub fn get(&self) -> u8 {
         self.0
     }
 }
@@ -295,18 +300,18 @@ macro_rules! adc_hal {
                 }
 
                 /// Set ADC sampling resolution
-                /// 
+                ///
                 /// Options can be found in [AdcSampleResolution](crate::adc::AdcSampleResolution)
                 pub fn set_resolution(&mut self, res: AdcSampleResolution) {
                     self.resolution = res;
                 }
 
                 /// Set ADC lshift
-                /// 
+                ///
                 /// LSHIFT[3:0] must be in range of 0..=15
                 pub fn set_lshift(&mut self, lshift: AdcLshift) {
                     self.lshift = lshift;
-                } 
+                }
 
                 /// Returns the largest possible sample value for the current settings
                 pub fn max_sample(&self) -> u32 {
@@ -314,12 +319,12 @@ macro_rules! adc_hal {
                 }
 
                 /// Disables Deeppowerdown-mode and enables voltage regulator
-                /// 
+                ///
                 /// Note: After power-up, a [`calibration`]: #method.calibrate shall be run
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.6
                 pub fn power_up(&mut self, delay: &mut Delay) {
-                    self.rb.cr.modify(|_, w| 
+                    self.rb.cr.modify(|_, w|
                         w.deeppwd().clear_bit()
                             .advregen().set_bit()
                     );
@@ -327,12 +332,12 @@ macro_rules! adc_hal {
                 }
 
                 /// Enables Deeppowerdown-mode and disables voltage regulator
-                /// 
+                ///
                 /// Note: This resets the [`calibration`]: #method.calibrate of the ADC
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.6
                 pub fn power_down(&mut self) {
-                    self.rb.cr.modify(|_, w| 
+                    self.rb.cr.modify(|_, w|
                         w.deeppwd().set_bit()
                             .advregen().clear_bit()
                     );
@@ -364,15 +369,15 @@ macro_rules! adc_hal {
                 }
 
                 /// Calibrates the ADC in single channel mode
-                /// 
-                /// Note: The ADC must be disabled 
+                ///
+                /// Note: The ADC must be disabled
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.8
                 pub fn calibrate(&mut self) {
                     self.check_calibration_conditions();
-                    
+
                     // single channel (INNx equals to V_ref-)
-                    self.rb.cr.modify(|_, w| 
+                    self.rb.cr.modify(|_, w|
                         w.adcaldif().clear_bit()
                             .adcallin().set_bit()
                     );
@@ -398,7 +403,7 @@ macro_rules! adc_hal {
                     self.rb.calfact.read().calfact_s().bits()
                 }
 
-                /// Returns the linear calibration values stored in an array in the following order: 
+                /// Returns the linear calibration values stored in an array in the following order:
                 /// LINCALRDYW1 -> result[0]
                 /// ...
                 /// LINCALRDYW6 -> result[5]
@@ -472,7 +477,7 @@ macro_rules! adc_hal {
                             .discen().set_bit()
                     );
                     // Enables boost mode since clock frequency > 20MHz
-                    // 
+                    //
                     // Refer to RM0433 Rev 6 - Chapter 24.4.3
                     self.rb.cr.modify(|_, w| w.boost().set_bit());
                 }
@@ -522,12 +527,12 @@ macro_rules! adc_hal {
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.get_resolution().into()) });
 
                     // Set LSHIFT[3:0]
-                    self.rb.cfgr2.modify(|_, w| unsafe { w.lshift().bits(self.get_lshift().get()) });
+                    self.rb.cfgr2.modify(|_, w| w.lshift().bits(self.get_lshift().get()));
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
                     self.set_chan_smp(chan);
-                    self.rb.sqr1.modify(|_, w| unsafe { 
+                    self.rb.sqr1.modify(|_, w| unsafe {
                         w.sq1().bits(chan)
                             .l().bits(0)
                     });
@@ -567,7 +572,7 @@ macro_rules! adc_hal {
 
             impl<WORD, PIN> OneShot<$ADC, WORD, PIN> for Adc<$ADC>
             where
-                WORD: From<u32>, 
+                WORD: From<u32>,
                 PIN: Channel<$ADC, ID = u8>,
             {
                 type Error = ();
