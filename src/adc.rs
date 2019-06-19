@@ -19,14 +19,13 @@ pub struct Adc<ADC> {
     lshift: AdcLshift,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[allow(non_camel_case_types)]
-
 /// ADC sampling time
 ///
 /// Options for the sampling time, each is T + 0.5 ADC clock cycles.
 //
 // Refer to RM0433 Rev 6 - Chapter 24.4.13
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(non_camel_case_types)]
 pub enum AdcSampleTime {
     /// 1.5 cycles sampling time
     T_1,
@@ -132,6 +131,24 @@ impl AdcLshift {
     }
 
     pub fn value(self) -> u8 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AdcCalOffst(u16);
+
+impl AdcCalOffset {
+    pub fn value(self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AdcCalLinear([u32; 6]);
+
+impl AdcCalLinear {
+    pub fn value(self) -> [u32; 6] {
         self.0
     }
 }
@@ -399,8 +416,8 @@ macro_rules! adc_hal {
                 }
 
                 /// Returns the offset calibration value for single ended channel
-                pub fn read_offset_calibration_value(&self) -> u16 {
-                    self.rb.calfact.read().calfact_s().bits()
+                pub fn read_offset_calibration_value(&self) -> AdcCalOffset {
+                    AdcCalOffset(self.rb.calfact.read().calfact_s().bits())
                 }
 
                 /// Returns the linear calibration values stored in an array in the following order:
@@ -409,7 +426,7 @@ macro_rules! adc_hal {
                 /// LINCALRDYW6 -> result[5]
                 //
                 // Refer to RM0433 Rev 6 - Chapter 24.4.8 (Page 920)
-                pub fn read_linear_calibration_values(&mut self) -> [u32; 6] {
+                pub fn read_linear_calibration_values(&mut self) -> AdcCalLinear {
                     self.check_linear_read_conditions();
 
                     // Read 1st block of linear correction
@@ -442,7 +459,7 @@ macro_rules! adc_hal {
                     while self.rb.cr.read().lincalrdyw6().bit_is_set() {}
                     let res_6 = self.rb.calfact2.read().lincalfact().bits();
 
-                    [res_1, res_2, res_3, res_4, res_5, res_6]
+                    AdcCalLinear([res_1, res_2, res_3, res_4, res_5, res_6])
                 }
 
                 fn check_linear_read_conditions(&self) {
