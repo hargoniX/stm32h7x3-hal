@@ -68,14 +68,13 @@ impl From<AdcSampleTime> for u8 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[allow(non_camel_case_types)]
-
 /// ADC sampling resolution
 ///
 /// Options for sampling resolution
 //
 // Refer to RM0433 Rev 6 - Chapter 24.2
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(non_camel_case_types)]
 pub enum AdcSampleResolution {
     /// 16 bit resulution
     B_16,
@@ -113,15 +112,14 @@ impl From<AdcSampleResolution> for u8 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-
 /// ADC LSHIFT[3:0] of the converted value
 ///
 /// Only values in range of 0..=15 are allowed.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AdcLshift(u8);
 
 impl AdcLshift {
-    pub fn value(lshift: u8) -> Self {
+    pub fn new(lshift: u8) -> Self {
         if lshift > 15 {
             panic!("LSHIFT[3:0] must be in range of 0..=15");
         }
@@ -133,14 +131,8 @@ impl AdcLshift {
         AdcLshift(0)
     }
 
-    pub fn get(&self) -> u8 {
+    pub fn value(self) -> u8 {
         self.0
-    }
-}
-
-impl From<AdcLshift> for u8 {
-    fn from(val: AdcLshift) -> u8 {
-        val.get()
     }
 }
 
@@ -323,7 +315,7 @@ macro_rules! adc_hal {
 
                 /// Returns the largest possible sample value for the current settings
                 pub fn max_sample(&self) -> u32 {
-                    (1 << self.resolution as u32) - 1
+                    ((1 << self.get_resolution() as u32) - 1) << self.get_lshift().value() as u32
                 }
 
                 /// Disables Deeppowerdown-mode and enables voltage regulator
@@ -566,7 +558,7 @@ macro_rules! adc_hal {
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.get_resolution().into()) });
 
                     // Set LSHIFT[3:0]
-                    self.rb.cfgr2.modify(|_, w| w.lshift().bits(self.get_lshift().into()));
+                    self.rb.cfgr2.modify(|_, w| w.lshift().bits(self.get_lshift().value()));
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
