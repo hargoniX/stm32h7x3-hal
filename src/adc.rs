@@ -486,6 +486,34 @@ macro_rules! adc_hal {
                     //
                     // Refer to RM0433 Rev 6 - Chapter 24.4.3
                     self.rb.cr.modify(|_, w| w.boost().set_bit());
+
+                    self.configure_channels_dif_mode();
+                }
+
+                // Sets channels to single ended mode
+                fn configure_channels_dif_mode(&mut self) {
+                    self.rb.difsel.modify(|_, w|
+                        w.difsel0().clear_bit()
+                            .difsel1().clear_bit()
+                            .difsel2().clear_bit()
+                            .difsel3().clear_bit()
+                            .difsel4().clear_bit()
+                            .difsel5().clear_bit()
+                            .difsel6().clear_bit()
+                            .difsel7().clear_bit()
+                            .difsel8().clear_bit()
+                            .difsel9().clear_bit()
+                            .difsel10().clear_bit()
+                            .difsel11().clear_bit()
+                            .difsel12().clear_bit()
+                            .difsel13().clear_bit()
+                            .difsel14().clear_bit()
+                            .difsel15().clear_bit()
+                            .difsel16().clear_bit()
+                            .difsel17().clear_bit()
+                            .difsel18().clear_bit()
+                            .difsel19().clear_bit()
+                    );
                 }
 
                 fn stop_regular_conversion(&mut self) {
