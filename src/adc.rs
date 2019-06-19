@@ -137,6 +137,12 @@ impl AdcLshift {
     }
 }
 
+impl From<AdcLshift> for u8 {
+    fn from(val: AdcLshift) -> u8 {
+        val.get()
+    }
+}
+
 macro_rules! adc_pins {
     ($ADC:ident, $($pin:ident => $chan:expr),+ $(,)*) => {
         $(
@@ -527,7 +533,7 @@ macro_rules! adc_hal {
                     self.rb.cfgr.modify(|_, w| unsafe { w.res().bits(self.get_resolution().into()) });
 
                     // Set LSHIFT[3:0]
-                    self.rb.cfgr2.modify(|_, w| w.lshift().bits(self.get_lshift().get()));
+                    self.rb.cfgr2.modify(|_, w| w.lshift().bits(self.get_lshift().into()));
 
                     // Select channel (with preselection, refer to RM0433 Rev 6 - Chapter 24.4.12)
                     self.rb.pcsel.modify(|r, w| unsafe { w.pcsel().bits(r.pcsel().bits() | (1 << chan)) });
