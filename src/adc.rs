@@ -136,7 +136,7 @@ impl AdcLshift {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct AdcCalOffst(u16);
+pub struct AdcCalOffset(u16);
 
 impl AdcCalOffset {
     pub fn value(self) -> u16 {
