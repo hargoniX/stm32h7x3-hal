@@ -18,3 +18,4 @@ pub mod serial;
 pub use stm32h7::stm32h7x3;
 pub use stm32h7::stm32h7x3 as pac;
 pub use compile_time_calculations::*;
+pub mod adc;
